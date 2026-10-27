@@ -67,7 +67,7 @@ export default function Index() {
             <Head title="Comprehensive Exam • Payment" />
 
             <div className="flex h-full flex-1 flex-col gap-5 overflow-auto px-7 pt-5">
-                <div className="w-full overflow-hidden rounded-lg border border-zinc-200 bg-white px-2">
+                <div className="bg-card text-card-foreground border-border w-full overflow-hidden rounded-lg border px-2">
                     {/* Header row (mirrors comprehensive exam header) */}
                     <div className="flex w-full flex-row items-center justify-between border-b p-3">
                         <div className="flex items-center gap-2">
@@ -136,7 +136,7 @@ export default function Index() {
                         <div className="flex flex-1 flex-col items-center justify-center space-y-6 px-4">
                             <Check size={48} className="text-rose-500" />
                             <h2 className="text-2xl font-semibold">Payment Submitted!</h2>
-                            <p className="text-center text-gray-600">Your payment has been saved successfully.</p>
+                            <p className="text-muted-foreground text-center">Your payment has been saved successfully.</p>
                             <Button
                                 onClick={() => {
                                     setOpen(false);

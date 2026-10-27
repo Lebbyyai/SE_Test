@@ -112,7 +112,7 @@ export default function PaymentForm({ canSubmit, payment, onSuccess }: Props) {
     }
 
     return (
-        <div className="rounded-lg bg-white">
+        <div className="bg-background text-foreground rounded-lg">
             {/* Reduced header height */}
             <div className="border-b border-slate-200 py-4 dark:border-slate-700">
                 <h2 className="text-lg font-semibold">Payment Form</h2>
