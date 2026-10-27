@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { Head } from '@inertiajs/react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 type Template = { id: number; name: string; code: string; version: number };
@@ -19,6 +19,7 @@ const templateOptions = [
 
 export default function DocumentTemplatesIndex() {
     const [list, setList] = useState<Template[]>([]);
+    const fileInput = useRef<HTMLInputElement>(null);
     const [file, setFile] = useState<File | null>(null);
     const [form, setForm] = useState({ name: '' });
     const [busy, setBusy] = useState(false);
@@ -56,6 +57,7 @@ export default function DocumentTemplatesIndex() {
         if (r.ok) {
             setForm({ name: '' });
             setFile(null);
+            if (fileInput.current) fileInput.current.value = '';
             load();
         }
     }
@@ -80,7 +82,33 @@ export default function DocumentTemplatesIndex() {
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <input type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                            <div className="space-y-2">
+                                <input
+                                    ref={fileInput}
+                                    type="file"
+                                    accept=".pdf,application/pdf"
+                                    aria-label="PDF template file"
+                                    className="hidden"
+                                    disabled={busy}
+                                    onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full"
+                                    disabled={busy}
+                                    aria-describedby="template-file-name template-file-help"
+                                    onClick={() => fileInput.current?.click()}
+                                >
+                                    Add File
+                                </Button>
+                                <p id="template-file-name" role="status" className="text-muted-foreground text-sm break-all">
+                                    {file?.name ?? 'No file chosen'}
+                                </p>
+                                <p id="template-file-help" className="text-muted-foreground text-xs">
+                                    PDF only, up to 10 MB.
+                                </p>
+                            </div>
                             <Button disabled={!file || !form.name || busy} type="submit">
                                 {busy ? 'Uploading...' : 'Upload'}
                             </Button>
