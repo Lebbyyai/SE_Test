@@ -93,3 +93,36 @@ test('adviser decision notifies the student and coordinator and cannot be replay
     ['accept', 'accepted', 'Adviser assignment accepted'],
     ['reject', 'rejected', 'Adviser assignment declined'],
 ]);
+
+test('adviser email choice does not change the decision or in-app notices', function (string $decision, string $mailClass, bool $sendEmail) {
+    $coordinator = User::factory()->create(['role' => 'Coordinator']);
+    $adviser = User::factory()->create(['role' => 'Adviser']);
+    $student = User::factory()->create(['role' => 'Student']);
+    $adviser->advisedStudents()->attach($student->id, ['status' => 'pending', 'requested_by' => $coordinator->id]);
+    $this->actingAs($adviser)->postJson('/api/adviser/pending-students/'.$student->id.'/'.$decision, ['send_email' => $sendEmail])->assertOk();
+    $this->assertDatabaseHas('adviser_student', ['adviser_id' => $adviser->id, 'student_id' => $student->id, 'status' => $decision === 'accept' ? 'accepted' : 'rejected']);
+    $this->assertDatabaseCount('notifications', 2);
+    if ($sendEmail) {
+        Mail::assertSent($mailClass, fn ($mail) => $mail->hasTo($student->email));
+        Mail::assertSentCount(1);
+    } else {
+        Mail::assertNothingSent();
+    }
+})->with([
+    ['accept', \App\Mail\StudentAcceptedByAdviser::class, false],
+    ['accept', \App\Mail\StudentAcceptedByAdviser::class, true],
+    ['reject', \App\Mail\StudentRejectedByAdviser::class, false],
+    ['reject', \App\Mail\StudentRejectedByAdviser::class, true],
+]);
+
+test('invalid email choice cannot update a pending assignment', function () {
+    $adviser = User::factory()->create(['role' => 'Adviser']);
+    $student = User::factory()->create(['role' => 'Student']);
+    $adviser->advisedStudents()->attach($student->id, ['status' => 'pending']);
+    foreach (['accept', 'reject'] as $decision) {
+        $this->actingAs($adviser)->postJson('/api/adviser/pending-students/'.$student->id.'/'.$decision, ['send_email' => 'invalid'])->assertUnprocessable()->assertJsonValidationErrors('send_email');
+    }
+    $this->assertDatabaseHas('adviser_student', ['adviser_id' => $adviser->id, 'student_id' => $student->id, 'status' => 'pending']);
+    $this->assertDatabaseCount('notifications', 0);
+    Mail::assertNothingSent();
+});

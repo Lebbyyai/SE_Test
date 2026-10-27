@@ -86,6 +86,8 @@ class AdviserStudentController extends Controller
     // Adviser accepts a pending student
     public function acceptPending(Request $request, $studentId)
     {
+        $request->validate(['send_email' => 'sometimes|boolean']);
+
         $adviser = $request->user();
 
         if (! $adviser->advisedStudents()->wherePivot('student_id', $studentId)->wherePivot('status', 'pending')->exists()) {
@@ -99,7 +101,7 @@ class AdviserStudentController extends Controller
         // Send welcome email to student
         try {
             $student = User::find($studentId);
-            if ($student && $student->email) {
+            if ($request->boolean('send_email') && $student && $student->email) {
                 Mail::to($student->email)
                     ->send(new \App\Mail\StudentAcceptedByAdviser($student, $adviser));
 
@@ -125,6 +127,8 @@ class AdviserStudentController extends Controller
     // Adviser rejects a pending student (marks rejected and sends email)
     public function rejectPending(Request $request, $studentId)
     {
+        $request->validate(['send_email' => 'sometimes|boolean']);
+
         $adviser = $request->user();
 
         if (! $adviser->advisedStudents()->wherePivot('student_id', $studentId)->wherePivot('status', 'pending')->exists()) {
@@ -139,7 +143,7 @@ class AdviserStudentController extends Controller
         // Send rejection email to student
         try {
             $student = User::find($studentId);
-            if ($student && $student->email) {
+            if ($request->boolean('send_email') && $student && $student->email) {
                 // Get the pivot data to find who assigned this student
                 $pivotStudent = $adviser->advisedStudents()->wherePivot('student_id', $studentId)->first();
                 $coordinatorId = $pivotStudent->pivot->requested_by ?? null;

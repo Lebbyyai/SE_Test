@@ -1,11 +1,12 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import axios from 'axios';
-import { Check, Trash, Users } from 'lucide-react';
+import { Check, Mail, Trash, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 type Student = {
@@ -32,9 +33,7 @@ export default function ShowStudents() {
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState('');
 
-    // Confirmation dialog state
-    const [,] = useState(false);
-    const [,] = useState<Student | null>(null);
+    const [confirmation, setConfirmation] = useState<{ student: Student; decision: 'accept' | 'reject' } | null>(null);
 
     useEffect(() => {
         loadAccepted();
@@ -77,7 +76,7 @@ export default function ShowStudents() {
 
     const [assignmentError, setAssignmentError] = useState('');
     const [decidingStudent, setDecidingStudent] = useState<number | null>(null);
-    const decideAssignment = async (student: Student, decision: 'accept' | 'reject') => {
+    const decideAssignment = async (student: Student, decision: 'accept' | 'reject', sendEmail: boolean) => {
         setAssignmentError('');
         setDecidingStudent(student.id);
         try {
@@ -87,11 +86,12 @@ export default function ShowStudents() {
                 .find((part) => part.startsWith('XSRF-TOKEN='));
             await axios.post(
                 `/api/adviser/pending-students/${student.id}/${decision}`,
-                {},
+                { send_email: sendEmail },
                 {
                     headers: { Accept: 'application/json', ...(token ? { 'X-XSRF-TOKEN': decodeURIComponent(token.slice(11)) } : {}) },
                 },
             );
+            setConfirmation(null);
             await loadAccepted();
             await fetchPending();
             window.dispatchEvent(new Event('notifications-updated'));
@@ -148,7 +148,11 @@ export default function ShowStudents() {
                             variant="outline"
                             size="icon"
                             title="Accept"
-                            onClick={() => decideAssignment(s, 'accept')}
+                            onClick={() => {
+                                setAssignmentError('');
+                                setConfirmation({ student: s, decision: 'accept' });
+                            }}
+                            aria-label={`Accept ${s.first_name ?? ''} ${s.last_name ?? ''}`}
                             disabled={decidingStudent !== null}
                             className="border-green-300 text-green-600 hover:bg-green-50 hover:text-green-700"
                         >
@@ -158,7 +162,11 @@ export default function ShowStudents() {
                             variant="outline"
                             size="icon"
                             title="Reject"
-                            onClick={() => decideAssignment(s, 'reject')}
+                            onClick={() => {
+                                setAssignmentError('');
+                                setConfirmation({ student: s, decision: 'reject' });
+                            }}
+                            aria-label={`Decline ${s.first_name ?? ''} ${s.last_name ?? ''}`}
                             disabled={decidingStudent !== null}
                             className="border-rose-300 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
                         >
@@ -270,6 +278,64 @@ export default function ShowStudents() {
                     </div>
                 </TabsContent>
             </Tabs>
+            <Dialog
+                open={confirmation !== null}
+                onOpenChange={(open) => {
+                    if (!open && decidingStudent === null) setConfirmation(null);
+                }}
+            >
+                <DialogContent
+                    className="sm:max-w-lg"
+                    onEscapeKeyDown={(event) => {
+                        if (decidingStudent !== null) event.preventDefault();
+                    }}
+                    onPointerDownOutside={(event) => {
+                        if (decidingStudent !== null) event.preventDefault();
+                    }}
+                >
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Mail className={confirmation?.decision === 'accept' ? 'size-5 text-green-500' : 'size-5 text-rose-500'} />
+                            {confirmation?.decision === 'accept' ? 'Send Acceptance Email?' : 'Send Decline Email?'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            You are {confirmation?.decision === 'accept' ? 'accepting' : 'declining'} this student assignment. Would you also like to
+                            send an email notification to the student?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="bg-muted rounded-lg p-4 text-sm">
+                        <p className="font-semibold">
+                            {confirmation?.student.first_name} {confirmation?.student.last_name}
+                        </p>
+                        <p className="text-muted-foreground mt-1">{confirmation?.student.email}</p>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                        Both options save your decision and notify the student and coordinator in the system. Skip Email only skips the email.
+                    </p>
+                    {assignmentError && (
+                        <p role="alert" className="text-destructive text-sm">
+                            {assignmentError}
+                        </p>
+                    )}
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            disabled={decidingStudent !== null}
+                            onClick={() => confirmation && decideAssignment(confirmation.student, confirmation.decision, false)}
+                        >
+                            Skip Email
+                        </Button>
+                        <Button
+                            className={confirmation?.decision === 'accept' ? 'bg-green-700 text-white hover:bg-green-800' : ''}
+                            disabled={decidingStudent !== null}
+                            onClick={() => confirmation && decideAssignment(confirmation.student, confirmation.decision, true)}
+                        >
+                            <Mail className="mr-2 size-4" />
+                            {decidingStudent !== null ? 'Saving...' : 'Send Email'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
