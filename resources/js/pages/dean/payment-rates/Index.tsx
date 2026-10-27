@@ -1,11 +1,11 @@
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'; // Add this import
 import AppLayout from '@/layouts/app-layout';
 import { Head, usePage } from '@inertiajs/react';
-import { Pencil, Printer } from 'lucide-react'; // Add this import for the edit icon
+import { Download, Pencil, Printer, Upload } from 'lucide-react'; // Add this import for the edit icon
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -48,6 +48,59 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
     } | null>(null);
     const [saving, setSaving] = useState(false);
     const [tab, setTab] = useState<string>(PROGRAM_LEVELS[0]); // Add state for tab
+
+    const [importLevel, setImportLevel] = useState<string | null>(null);
+    const [importFile, setImportFile] = useState<File | null>(null);
+    const [importRows, setImportRows] = useState<(Rate & { previous_amount: number | null; action: string })[]>([]);
+    const [importing, setImporting] = useState(false);
+    const [importError, setImportError] = useState('');
+
+    function closeImport() {
+        if (importing) return;
+        setImportLevel(null);
+        setImportFile(null);
+        setImportRows([]);
+        setImportError('');
+    }
+
+    async function importCsv(mode: 'preview' | 'apply') {
+        if (!importFile || !importLevel) return;
+        setImporting(true);
+        setImportError('');
+        try {
+            const form = new FormData();
+            form.append('file', importFile);
+            form.append('program_level', importLevel);
+            form.append('mode', mode);
+            const response = await fetch('/dean/payment-rates/import', {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
+                },
+                body: form,
+            });
+            if (response.status === 419) throw new Error('Your session expired. Refresh the page and sign in again.');
+            const data = await response.json();
+            if (!response.ok) {
+                const errors = data.errors as Record<string, string[]> | undefined;
+                throw new Error(errors ? Object.values(errors).flat().join(' ') : data.message || 'Import failed.');
+            }
+            if (mode === 'preview') {
+                setImportRows(data.rows);
+            } else {
+                setRates(data.rates);
+                setImportRows([]);
+                setImportFile(null);
+                setImportLevel(null);
+                toast.success(`${data.count} rate entries imported.`);
+            }
+        } catch (error) {
+            setImportError(error instanceof Error ? error.message : 'Unable to import this file.');
+        } finally {
+            setImporting(false);
+        }
+    }
 
     function openEdit(program_level: string, type: string, idxs: { [defense_type: string]: number }) {
         if (!canEdit) return;
@@ -256,10 +309,21 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                             ))}
                         </TabsList>
                     </Tabs>
-                    <Button variant="outline" className="flex items-center gap-2 text-sm" onClick={() => exportTableToPrint(tab)}>
-                        <Printer className="h-4 w-4" />
-                        Print
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" asChild>
+                            <a href={`/dean/payment-rates/export?program_level=${encodeURIComponent(tab)}`}>
+                                <Download className="h-4 w-4" /> Export
+                            </a>
+                        </Button>
+                        {canEdit && (
+                            <Button variant="outline" onClick={() => setImportLevel(tab)}>
+                                <Upload className="h-4 w-4" /> Import
+                            </Button>
+                        )}
+                        <Button variant="outline" onClick={() => exportTableToPrint(tab)}>
+                            <Printer className="h-4 w-4" /> Print
+                        </Button>
+                    </div>
                 </div>
                 {/* Responsive Table */}
                 <Tabs value={tab} onValueChange={setTab} className="px-2 sm:px-6">
@@ -344,6 +408,89 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                         </TabsContent>
                     ))}
                 </Tabs>
+                <Dialog
+                    open={importLevel !== null}
+                    onOpenChange={(open) => {
+                        if (!open) closeImport();
+                    }}
+                >
+                    <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Import {importLevel} payment rates</DialogTitle>
+                            <DialogDescription>
+                                Export this program�s CSV first, edit it in Excel, and save as CSV. Use numeric amounts without currency signs or
+                                commas. Only filled amounts are updated; blank amounts, omitted rates, and other programs are kept. Enter 0 to set a
+                                zero rate.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <label htmlFor="payment-rate-csv" className="text-sm font-medium">
+                            CSV file (maximum 256 KB)
+                        </label>
+                        <Input
+                            id="payment-rate-csv"
+                            type="file"
+                            accept=".csv,text/csv"
+                            disabled={importing}
+                            onChange={(event) => {
+                                setImportFile(event.target.files?.[0] ?? null);
+                                setImportRows([]);
+                                setImportError('');
+                            }}
+                        />
+                        {importError && (
+                            <p role="alert" className="text-destructive text-sm">
+                                {importError}
+                            </p>
+                        )}
+                        {importRows.length > 0 && (
+                            <div className="space-y-2">
+                                <p className="text-sm">
+                                    Review {importRows.length} entries before saving. Existing payments keep their recorded amounts.
+                                </p>
+                                <div className="max-h-72 overflow-auto rounded-md border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Type</TableHead>
+                                                <TableHead>Defense</TableHead>
+                                                <TableHead>Current</TableHead>
+                                                <TableHead>Imported</TableHead>
+                                                <TableHead>Change</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {importRows.map((row) => (
+                                                <TableRow key={`${row.type}-${row.defense_type}`}>
+                                                    <TableCell>{row.type}</TableCell>
+                                                    <TableCell>{row.defense_type}</TableCell>
+                                                    <TableCell>
+                                                        {row.previous_amount === null ? 'Not set' : Number(row.previous_amount).toFixed(2)}
+                                                    </TableCell>
+                                                    <TableCell>{Number(row.amount).toFixed(2)}</TableCell>
+                                                    <TableCell>{row.action}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button variant="outline" disabled={importing} onClick={closeImport}>
+                                Cancel
+                            </Button>
+                            {importRows.length === 0 ? (
+                                <Button disabled={!importFile || importing} onClick={() => importCsv('preview')}>
+                                    {importing ? 'Checking�' : 'Review import'}
+                                </Button>
+                            ) : (
+                                <Button disabled={importing} onClick={() => importCsv('apply')}>
+                                    {importing ? 'Saving�' : 'Apply import'}
+                                </Button>
+                            )}
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
                 {/* Edit Dialog */}
                 <Dialog open={!!edit} onOpenChange={closeEdit}>
                     <DialogContent>

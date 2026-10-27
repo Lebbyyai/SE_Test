@@ -108,6 +108,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/assistant/defense-batches/{batch}/status', [\App\Http\Controllers\Assistant\DefenseBatchController::class, 'updateStatus']);
 
     // PAYMENT RATESS ETC.
+    Route::get('/dean/payment-rates/export', [\App\Http\Controllers\PaymentRateController::class, 'export'])->name('dean.payment-rates.export');
+    Route::post('/dean/payment-rates/import', [\App\Http\Controllers\PaymentRateController::class, 'import'])->name('dean.payment-rates.import');
     Route::post('/dean/payment-rates', [\App\Http\Controllers\PaymentRateController::class, 'update'])
         ->name('dean.payment-rates.update');
     Route::get('/dean/payment-rates', [\App\Http\Controllers\PaymentRateController::class, 'index'])
