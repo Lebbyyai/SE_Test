@@ -215,7 +215,7 @@ class DashboardController extends Controller
             'studentsCount' => $studentsCount,
         ];
 
-        if (in_array($effective, ['Coordinator', 'Administrative Assistant'], true)) {
+        if (in_array($effective, ['Coordinator', 'Administrative Assistant', 'Dean'], true)) {
             $honorariums = HonorariumDisbursement::whereIn('status', ['prepared', 'approved']);
             if ($effective === 'Coordinator') {
                 $honorariums->whereHas('defenseRequest', fn ($q) => $q->where('coordinator_user_id', $user->id));

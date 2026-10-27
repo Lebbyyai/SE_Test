@@ -32,3 +32,5 @@ The regression suite uses an isolated test database, fake uploads and fake mail.
 - PHP formatting, frontend lint, TypeScript, frontend formatting and production build checked before publishing.
 - The updated formatter also normalized existing PHP source formatting without intended behavior changes.
 - A repeat live demo-role page audit was unavailable because local MySQL refused the connection. The isolated automated tests do not depend on that server. No database reset or uploaded-file replacement was performed.
+
+The later live verification completed successfully after repairing local MariaDB access. See [live role verification](live-role-verification-2026-10-27.md) for results and the additional Dean dashboard count fix.

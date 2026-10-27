@@ -13,6 +13,7 @@ import DefenseCountLineChart from '../widgets/visual-charts/defense-count';
 
 type PageProps = {
     graduateStaff?: GraduateStaff[];
+    stats?: { pending_honorariums: number };
     auth: {
         user: {
             id: number;
@@ -40,6 +41,7 @@ export default function DeanDashboard() {
     const {
         auth: { user },
         graduateStaff = [],
+        stats,
     } = usePage<PageProps>().props;
 
     const [todayEventCount, setTodayEventCount] = useState<number | null>(null);
@@ -115,7 +117,7 @@ export default function DeanDashboard() {
         },
         {
             title: 'Pending Honorariums',
-            value: 7, // Replace with real value if available
+            value: stats?.pending_honorariums ?? 'Unavailable',
             description: 'Honorariums not yet processed',
             icon: <BadgeDollarSign className="size-5 text-rose-400" />,
             iconTheme: 'bg-rose-100 text-rose-600 dark:bg-rose-900 dark:text-rose-300',

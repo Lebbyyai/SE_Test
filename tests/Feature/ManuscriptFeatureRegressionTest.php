@@ -3,6 +3,7 @@
 use App\Models\Adviser;
 use App\Models\DefenseRequest;
 use App\Models\DocumentTemplate;
+use App\Models\HonorariumDisbursement;
 use App\Models\Panelist;
 use App\Models\PaymentSubmission;
 use App\Models\User;
@@ -290,5 +291,25 @@ class ManuscriptFeatureRegressionTest extends TestCase
         $adviser = User::findOrFail($data['adviser_id']);
         $this->actingAs($adviser)->postJson($url, ['endorsement_form' => UploadedFile::fake()->create('form.exe', 1, 'application/octet-stream')])->assertUnprocessable();
         $this->postJson($url, ['endorsement_form' => UploadedFile::fake()->createWithContent('form.pdf', "%PDF-1.4\n%%EOF")])->assertOk();
+    }
+
+    public function test_dean_honorarium_count_tracks_unprocessed_saved_disbursements(): void
+    {
+        $dean = User::factory()->create(['role' => 'Dean']);
+        $student = User::factory()->create(['role' => 'Student']);
+        $request = DefenseRequest::withoutEvents(fn () => DefenseRequest::create([
+            'submitted_by' => $student->id, 'first_name' => 'Audit', 'last_name' => 'Student',
+            'defense_adviser' => 'Audit Adviser', 'proof_of_payment' => 'receipt.pdf',
+            'school_id' => 'HONORARIUM-TEST', 'program' => 'Master of Arts', 'thesis_title' => 'Metric Test',
+            'defense_type' => 'Proposal', 'status' => 'Pending', 'workflow_state' => 'submitted',
+        ]));
+        foreach (['prepared', 'claimed'] as $status) {
+            HonorariumDisbursement::create([
+                'defense_request_id' => $request->id, 'recipient_key' => $status, 'recipient_name' => 'Audit Recipient',
+                'recipient_role' => 'Adviser', 'amount' => 100, 'school_year' => '2026-2027', 'semester' => '1',
+                'status' => $status, 'history' => [], 'prepared_by' => $dean->id,
+            ]);
+        }
+        $this->actingAs($dean)->get('/dashboard')->assertOk()->assertInertia(fn ($page) => $page->where('stats.pending_honorariums', 1));
     }
 }

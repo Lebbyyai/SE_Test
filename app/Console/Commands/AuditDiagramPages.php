@@ -31,11 +31,12 @@ class AuditDiagramPages extends Command
             'aa@uic.edu.ph' => ['/dashboard', '/assistant/all-defense-list', '/honorarium-summary', '/honorarium-workspace', '/honorarium-documents', '/honorarium-ledger'],
             'finance@uic.edu.ph' => ['/dashboard', '/honorarium-workspace', '/honorarium-documents'],
             'dean@uic.edu.ph' => ['/dashboard', '/dean/payment-rates', '/settings/documents'],
+            'superadmin@uic.edu.ph' => ['/dashboard'],
         ];
         $results = [];
         $kernel = app(Kernel::class);
         foreach ($pages as $email => $urls) {
-            $user = User::where('email', $email)->where('is_demo_account', true)->firstOrFail();
+            $user = User::where('email', $email)->when($email !== 'superadmin@uic.edu.ph', fn ($query) => $query->where('is_demo_account', true))->firstOrFail();
             foreach ($urls as $url) {
                 app('auth')->forgetGuards();
                 Auth::guard('web')->setUser($user);
@@ -50,6 +51,7 @@ class AuditDiagramPages extends Command
                     'role' => $user->role,
                     'url' => $url,
                     'status' => $response->getStatusCode(),
+                    'redirect_to' => $response->headers->get('Location'),
                     'component' => $component,
                     'component_exists' => $componentExists,
                     'error' => $response->getStatusCode() >= 400 ? ($body['message'] ?? 'Request failed') : null,
