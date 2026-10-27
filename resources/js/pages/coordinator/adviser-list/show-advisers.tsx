@@ -231,16 +231,54 @@ export default function ShowAdvisers() {
         setAddingStudent(true);
         setAddStudentError('');
         try {
-            await axios.post(`/api/coordinator/advisers/${viewAdviser.id}/students`, {
-                email: studentEmail.trim(),
-            });
+            const token = document.cookie
+                .split(';')
+                .map((part) => part.trim())
+                .find((part) => part.startsWith('XSRF-TOKEN='));
+            await axios.post(
+                `/api/coordinator/advisers/${viewAdviser.id}/students`,
+                {
+                    email: studentEmail.trim(),
+                },
+                {
+                    headers: {
+                        Accept: 'application/json',
+                        ...(token ? { 'X-XSRF-TOKEN': decodeURIComponent(token.slice('XSRF-TOKEN='.length)) } : {}),
+                    },
+                },
+            );
             // refresh pending list in the open view so coordinator sees it immediately
             await fetchPendingStudents(viewAdviser.id);
             await fetchStudents(viewAdviser.id);
             setAddStudentDialogOpen(false);
             setStudentEmail('');
         } catch (err: unknown) {
-            setAddStudentError((axios.isAxiosError(err) ? err.response?.data?.error : undefined) || 'Failed to add student.');
+            if (!axios.isAxiosError(err)) {
+                setAddStudentError('Unable to assign this student. Please try again.');
+            } else {
+                const status = err.response?.status;
+                const payload = err.response?.data as { error?: unknown; message?: unknown; errors?: Record<string, unknown> } | undefined;
+                const validationMessages = Object.values(payload?.errors ?? {})
+                    .flat()
+                    .filter((value): value is string => typeof value === 'string');
+                const suppliedError = typeof payload?.error === 'string' ? payload.error : '';
+                const messages: Record<number, string> = {
+                    401: 'Your sign-in has expired. Refresh the page and sign in again.',
+                    403: 'You do not have permission to assign a student to this adviser.',
+                    404: 'The student or adviser record could not be found. Refresh the adviser list and check the student email.',
+                    419: 'Your session token has expired. Refresh the page and try again.',
+                    500: 'The server could not save the assignment. Please try again or report this error.',
+                };
+                setAddStudentError(
+                    suppliedError ||
+                        validationMessages.join(' ') ||
+                        (status ? messages[status] : '') ||
+                        (status && status < 500 && typeof payload?.message === 'string' ? payload.message : '') ||
+                        (status
+                            ? `Assignment failed (HTTP ${status}). Please try again.`
+                            : 'Unable to reach the server. Check your connection and try again.'),
+                );
+            }
         } finally {
             setAddingStudent(false);
         }
