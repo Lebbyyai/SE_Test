@@ -39,8 +39,17 @@ class PaymentRateCsv
                     $this->invalid("Row {$line}: expected four columns and at most 200 rate rows.");
                 }
                 [$program, $type, $stage, $amount] = array_map('trim', $cells);
-                if ($program !== $level || ! in_array($type, self::TYPES, true) || ! in_array($stage, self::STAGES, true)) {
-                    $this->invalid("Row {$line}: use the selected program ({$level}) and a supported rate type and defense stage.");
+                if (! in_array($program, self::LEVELS, true)) {
+                    $this->invalid("Row {$line}: unknown program '{$program}'. Use Masteral or Doctorate.");
+                }
+                if ($program !== $level) {
+                    continue;
+                }
+                if (! in_array($type, self::TYPES, true)) {
+                    $this->invalid("Row {$line}: unknown rate type '{$type}'. Use a rate type from the exported template.");
+                }
+                if (! in_array($stage, self::STAGES, true)) {
+                    $this->invalid("Row {$line}: unknown defense stage '{$stage}'. Use Proposal, Pre-final or Final. Correct the row and check for duplicate rates before importing.");
                 }
                 $key = $type.'|'.$stage;
                 if (isset($seen[$key])) {
@@ -56,7 +65,7 @@ class PaymentRateCsv
                 $rows[] = ['program_level' => $program, 'type' => $type, 'defense_type' => $stage, 'amount' => $amount];
             }
             if ($rows === []) {
-                $this->invalid('Enter at least one numeric amount in the CSV. Blank amounts leave rates unchanged.');
+                $this->invalid("Enter at least one numeric amount for {$level} in the CSV. Blank amounts leave rates unchanged.");
             }
 
             return $rows;

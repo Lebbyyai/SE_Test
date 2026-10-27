@@ -36,6 +36,21 @@ type Props = {
     rates: Rate[];
 };
 
+function paymentRequestHeaders(): Record<string, string> {
+    const cookie = document.cookie
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.startsWith('XSRF-TOKEN='));
+    const token = cookie ? decodeURIComponent(cookie.slice('XSRF-TOKEN='.length)) : '';
+    return {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(token
+            ? { 'X-XSRF-TOKEN': token }
+            : { 'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '' }),
+    };
+}
+
 export default function PaymentRatesPage({ rates: initialRates }: Props) {
     const { auth } = usePage<{ auth: { user: { role: string } } }>().props;
     const canEdit = ['Dean', 'Super Admin'].includes(auth.user.role);
@@ -74,10 +89,8 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
             form.append('mode', mode);
             const response = await fetch('/dean/payment-rates/import', {
                 method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
-                },
+                headers: paymentRequestHeaders(),
+                credentials: 'same-origin',
                 body: form,
             });
             if (response.status === 419) throw new Error('Your session expired. Refresh the page and sign in again.');
@@ -136,9 +149,10 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
             const res = await fetch('/dean/payment-rates', {
                 method: 'POST',
                 headers: {
+                    ...paymentRequestHeaders(),
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
                 },
+                credentials: 'same-origin',
                 body: JSON.stringify({ rates: updates }),
             });
 
@@ -180,7 +194,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
     function displayAmount(val: string | number | undefined) {
         const num = parseFloat(val as string);
         if (!val || isNaN(num) || num === 0) return '--';
-        return `₱${num.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+        return `â‚±${num.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
     }
 
     function getRows(program_level: string) {
@@ -212,7 +226,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                 const val = row.values[idx]?.amount;
                 return val === undefined || val === null
                     ? '--'
-                    : `₱${parseFloat(val as string).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+                    : `â‚±${parseFloat(val as string).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
             });
             return [row.type, ...values];
         });
@@ -223,7 +237,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                 const total = rates
                     .filter((r) => r.program_level === program_level && r.defense_type === dtype && !r.type.startsWith('External Panel '))
                     .reduce((sum, r) => sum + (parseFloat(String(r.amount)) || 0), 0);
-                return total === 0 ? '--' : `₱${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+                return total === 0 ? '--' : `â‚±${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
             }),
         ];
 
@@ -418,9 +432,9 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                         <DialogHeader>
                             <DialogTitle>Import {importLevel} payment rates</DialogTitle>
                             <DialogDescription>
-                                Export this program�s CSV first, edit it in Excel, and save as CSV. Use numeric amounts without currency signs or
-                                commas. Only filled amounts are updated; blank amounts, omitted rates, and other programs are kept. Enter 0 to set a
-                                zero rate.
+                                Export the selected program CSV first, edit it in Excel, and save as CSV. Use numeric amounts without currency signs
+                                or commas. Only filled amounts are updated; blank amounts, omitted rates, and other programs are kept. Enter 0 to set
+                                a zero rate.
                             </DialogDescription>
                         </DialogHeader>
                         <label htmlFor="payment-rate-csv" className="text-sm font-medium">
@@ -481,11 +495,11 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                             </Button>
                             {importRows.length === 0 ? (
                                 <Button disabled={!importFile || importing} onClick={() => importCsv('preview')}>
-                                    {importing ? 'Checking�' : 'Review import'}
+                                    {importing ? 'Checking...' : 'Review import'}
                                 </Button>
                             ) : (
                                 <Button disabled={importing} onClick={() => importCsv('apply')}>
-                                    {importing ? 'Saving�' : 'Apply import'}
+                                    {importing ? 'Savingï¿½' : 'Apply import'}
                                 </Button>
                             )}
                         </DialogFooter>

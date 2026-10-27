@@ -70,7 +70,7 @@ test('invalid files do not partially apply valid rows', function (string $bad) {
     'formula' => 'Masteral,Adviser,Final,=2+3',
     'unknown type' => 'Masteral,Unknown,Final,100',
     'unknown stage' => 'Masteral,Adviser,Unknown,100',
-    'wrong program' => 'Doctorate,Adviser,Final,100',
+    'unknown program' => 'Other,Adviser,Final,100',
     'duplicate' => 'Masteral,Adviser,Proposal,200',
     'missing column' => 'Masteral,Adviser,Final',
 ]);
@@ -92,4 +92,20 @@ test('empty programs export a usable template and blank amounts preserve existin
     PaymentRate::create(['program_level' => 'Masteral', 'type' => 'Adviser', 'defense_type' => 'Proposal', 'amount' => 50]);
     $this->postJson('/dean/payment-rates/import', rateImportPayload("Masteral,Adviser,Proposal,\nMasteral,Adviser,Final,100"))->assertOk()->assertJsonPath('count', 1);
     $this->assertDatabaseHas('payment_rates', ['type' => 'Adviser', 'defense_type' => 'Proposal', 'amount' => 50]);
+});
+
+test('server CSV containing both programs previews only the selected program', function () {
+    $this->actingAs(User::factory()->create(['role' => 'Dean']));
+    $this->postJson('/dean/payment-rates/import', rateImportPayload("Doctorate,Adviser,Proposal,4000\nMasteral,Adviser,Proposal,2000", 'preview'))
+        ->assertOk()->assertJsonCount(1, 'rows')->assertJsonPath('rows.0.program_level', 'Masteral')->assertJsonPath('rows.0.amount', '2000');
+    $this->postJson('/dean/payment-rates/import', rateImportPayload("Doctorate,Adviser,Proposal,4000\nMasteral,Adviser,Proposal,2000"))->assertOk();
+    $this->assertDatabaseMissing('payment_rates', ['program_level' => 'Doctorate']);
+});
+
+test('misspelled server stage is reported without guessing or overwriting an existing final rate', function () {
+    PaymentRate::create(['program_level' => 'Masteral', 'type' => 'Adviser', 'defense_type' => 'Final', 'amount' => 1000]);
+    $this->actingAs(User::factory()->create(['role' => 'Dean']));
+    $this->postJson('/dean/payment-rates/import', rateImportPayload("Masteral,Adviser,Fincal Defense,2000\nMasteral,Adviser,Final,1000"))
+        ->assertUnprocessable()->assertJsonValidationErrors('file')->assertJsonFragment(['file' => ["Row 2: unknown defense stage 'Fincal Defense'. Use Proposal, Pre-final or Final. Correct the row and check for duplicate rates before importing."]]);
+    $this->assertDatabaseHas('payment_rates', ['program_level' => 'Masteral', 'type' => 'Adviser', 'defense_type' => 'Final', 'amount' => 1000]);
 });
