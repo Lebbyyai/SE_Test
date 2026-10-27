@@ -5,12 +5,14 @@ import type { DefenseOverview } from '@/types/workflows';
 import { usePage } from '@inertiajs/react';
 import { BadgeDollarSign, CalendarDays, ClipboardList, Moon, Sun, Users } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import GraduateStaffWidget, { type GraduateStaff } from '../widgets/graduate-staff-widget';
 import PendingDefenseRequestsWidget from '../widgets/pending-defense-request-widget';
 import QuickActionsWidget from '../widgets/quick-actions-widget';
+import SchedulesWidget from '../widgets/student-schedules-widget';
 import DefenseCountLineChart from '../widgets/visual-charts/defense-count';
-import WeeklyDefenseSchedulesWidget from '../widgets/weekly-defense-schedule-widget';
 
 type PageProps = {
+    graduateStaff?: GraduateStaff[];
     auth: {
         user: {
             id: number;
@@ -34,43 +36,18 @@ function isDaytime() {
     return hour >= 6 && hour < 18;
 }
 
-// Helper: Get unique panelists from defense requests
-
-// Helper: Count today's scheduled defenses
-function getTodaysSchedules(defenseRequests: DefenseOverview[]) {
-    const today = new Date();
-    return defenseRequests.filter((dr: DefenseOverview) => {
-        if (!dr.scheduled_date) return false;
-        const eventDate = new Date(dr.scheduled_date);
-        return (
-            eventDate.getFullYear() === today.getFullYear() && eventDate.getMonth() === today.getMonth() && eventDate.getDate() === today.getDate()
-        );
-    }).length;
-}
-
 export default function DeanDashboard() {
     const {
         auth: { user },
+        graduateStaff = [],
     } = usePage<PageProps>().props;
 
-    const [allRequests, setAllRequests] = useState<DefenseOverview[]>([]);
+    const [todayEventCount, setTodayEventCount] = useState<number | null>(null);
     const [pendingRequests, setPendingRequests] = useState<DefenseOverview[]>([]);
     const [loading, setLoading] = useState(true);
     const [panelistsCount, setPanelistsCount] = useState<number>(0);
     const [advisersCount, setAdvisersCount] = useState<number>(0);
     const [assignedProgramsCount, setAssignedProgramsCount] = useState<number>(0);
-
-    const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
-
-    const weekDays = [
-        { label: 'Sun', value: 0 },
-        { label: 'Mon', value: 1 },
-        { label: 'Tue', value: 2 },
-        { label: 'Wed', value: 3 },
-        { label: 'Thu', value: 4 },
-        { label: 'Fri', value: 5 },
-        { label: 'Sat', value: 6 },
-    ];
 
     useEffect(() => {
         // Fetch all defense requests (not just assigned to user)
@@ -80,13 +57,11 @@ export default function DeanDashboard() {
             .then((res) => (res.ok ? res.json() : []))
             .then((data) => {
                 const requests = Array.isArray(data) ? data : (data.defenseRequests ?? []);
-                setAllRequests(requests);
 
                 const pending = requests.filter((r: DefenseOverview) => (r.normalized_status || r.status) === 'Pending');
                 setPendingRequests(pending);
             })
             .catch(() => {
-                setAllRequests([]);
                 setPendingRequests([]);
             })
             .finally(() => setLoading(false));
@@ -122,8 +97,6 @@ export default function DeanDashboard() {
             .catch(() => setAssignedProgramsCount(0));
     }, []);
 
-    const todaysSchedules = getTodaysSchedules(allRequests);
-
     // Metric cards (overall, not just assigned to user)
     const metrics = [
         {
@@ -134,9 +107,9 @@ export default function DeanDashboard() {
             iconTheme: 'bg-rose-100 text-rose-600 dark:bg-rose-900 dark:text-rose-300',
         },
         {
-            title: "Today's Defense Schedules",
-            value: todaysSchedules,
-            description: 'Defenses scheduled for today',
+            title: "Today's Schedules",
+            value: todayEventCount ?? 'Checking...',
+            description: 'Defenses and school events today',
             icon: <CalendarDays className="size-5 text-violet-500" />,
             iconTheme: 'bg-violet-100 text-violet-600 dark:bg-violet-900 dark:text-violet-300',
         },
@@ -257,14 +230,8 @@ export default function DeanDashboard() {
                                 {/* Widgets Body - Mobile Responsive */}
                                 <div className="dark:bg-muted mt-2 mb-2 flex w-full flex-col gap-4 rounded-lg bg-gray-100 px-3 py-4 md:gap-6 md:rounded-xl md:px-4 md:py-8">
                                     <div className="mb-2 flex w-full flex-col gap-4">
-                                        <WeeklyDefenseSchedulesWidget
-                                            weekDays={weekDays}
-                                            selectedDay={selectedDay}
-                                            setSelectedDay={setSelectedDay}
-                                            approvedDefenses={allRequests}
-                                            referenceDate={new Date()}
-                                            loading={loading}
-                                        />
+                                        <SchedulesWidget onTodayCount={setTodayEventCount} />
+                                        <GraduateStaffWidget staff={graduateStaff} />
                                         <PendingDefenseRequestsWidget pendingRequests={pendingRequests} loading={loading} />
                                     </div>
                                 </div>

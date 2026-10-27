@@ -206,6 +206,10 @@ class DashboardController extends Controller
             'studentsCount' => $studentsCount,
         ];
 
+        if ($effective === 'Dean') {
+            $props['graduateStaff'] = $this->getGraduateStaff();
+        }
+
         // --- Coordinator specific data ---
         if ($effective === 'Coordinator') {
             $props['coordinatorStudents'] = $this->getCoordinatorStudents($user->email);
@@ -225,6 +229,33 @@ class DashboardController extends Controller
         }
 
         return Inertia::render('dashboard/Index', $props);
+    }
+
+    private function getGraduateStaff()
+    {
+        $staff = User::whereIn('role', ['Coordinator', 'Administrative Assistant'])
+            ->with('coordinatorPrograms')->orderBy('last_name')->orderBy('first_name')->get();
+        $ids = $staff->pluck('id');
+        $assignments = \App\Models\CoordinatorProgramAssignment::whereIn('coordinator_user_id', $ids)
+            ->where('is_active', true)->get()->groupBy('coordinator_user_id');
+        $advisers = \App\Models\Adviser::whereIn('coordinator_id', $ids)->get()->groupBy('coordinator_id');
+        $students = DB::table('adviser_student')->whereIn('requested_by', $ids)->where('status', 'accepted')
+            ->select('requested_by', DB::raw('count(distinct student_id) as total'))->groupBy('requested_by')->pluck('total', 'requested_by');
+
+        return $staff->map(function ($person) use ($assignments, $advisers, $students) {
+            $programs = collect($assignments->get($person->id, collect())->pluck('program_name'))
+                ->merge($person->coordinatorPrograms->pluck('program'))->filter()->unique()->values();
+            if ($programs->isEmpty() && $person->role === 'Coordinator') {
+                $programs = collect(CoordinatorProgramService::getProgramsByEmail($person->email));
+            }
+
+            return [
+                'id' => $person->id, 'name' => $person->display_name, 'email' => $person->email,
+                'role' => $person->role, 'programs' => $programs->all(),
+                'students' => $person->role === 'Coordinator' ? (int) $students->get($person->id, 0) : null,
+                'advisers' => $person->role === 'Coordinator' ? $advisers->get($person->id, collect())->pluck('email')->map(fn ($email) => strtolower($email))->unique()->count() : null,
+            ];
+        })->values();
     }
 
     /**
