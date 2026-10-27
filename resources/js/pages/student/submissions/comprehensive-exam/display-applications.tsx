@@ -157,7 +157,7 @@ export default function DisplayApplication({ application }: Props) {
                                     {subjects.map((s, i) => (
                                         <div
                                             key={i}
-                                            className="flex w-full items-center justify-between rounded-lg border p-2 transition hover:bg-zinc-50"
+                                            className="hover:bg-muted flex w-full items-center justify-between rounded-lg border p-2 transition"
                                         >
                                             <div className="min-w-0">
                                                 <div className="truncate text-sm font-medium">{s.subject}</div>

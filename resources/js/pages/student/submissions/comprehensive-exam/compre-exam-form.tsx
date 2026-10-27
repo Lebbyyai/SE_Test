@@ -112,7 +112,7 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
                         <div>
                             <Label className="text-s">First Name</Label>
                             <Input
-                                className="text-s h-10 text-black disabled:bg-white disabled:text-black disabled:opacity-100"
+                                className="text-s text-foreground disabled:bg-muted disabled:text-foreground h-10 disabled:opacity-100"
                                 value={user.first_name || ''} // changed
                                 readOnly
                                 disabled
@@ -121,7 +121,7 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
                         <div>
                             <Label className="text-s">Middle Initial</Label>
                             <Input
-                                className="text-s h-10 text-black disabled:bg-white disabled:text-black disabled:opacity-100"
+                                className="text-s text-foreground disabled:bg-muted disabled:text-foreground h-10 disabled:opacity-100"
                                 maxLength={3}
                                 value={user.middle_name?.[0] ?? ''} // changed
                                 readOnly
@@ -131,7 +131,7 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
                         <div>
                             <Label className="text-s">Last Name</Label>
                             <Input
-                                className="text-s h-10 text-black disabled:bg-white disabled:text-black disabled:opacity-100"
+                                className="text-s text-foreground disabled:bg-muted disabled:text-foreground h-10 disabled:opacity-100"
                                 value={user.last_name || ''} // changed
                                 readOnly
                                 disabled
@@ -140,7 +140,7 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
                         <div>
                             <Label className="text-s">School Year</Label>
                             <select
-                                className="text-s h-10 w-full rounded-md border bg-white px-3 focus:ring-2 focus:ring-rose-300 focus:outline-none"
+                                className="text-s border-border bg-background text-foreground h-10 w-full rounded-md border px-3 focus:ring-2 focus:ring-rose-300 focus:outline-none"
                                 value={data.schoolYear}
                                 onChange={(e) => setData('schoolYear', e.target.value)}
                             >
@@ -157,7 +157,7 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
                         <div>
                             <Label className="text-s">Program</Label>
                             <Input
-                                className="text-s h-10 w-105 text-black disabled:bg-white disabled:text-black disabled:opacity-100"
+                                className="text-s text-foreground disabled:bg-muted disabled:text-foreground h-10 w-105 disabled:opacity-100"
                                 value={data.program}
                                 readOnly
                                 disabled
@@ -206,7 +206,7 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
                         <div className="md:col-span-2">
                             <Label className="text-s">Email</Label>
                             <Input
-                                className="text-s h-10 text-black disabled:bg-white disabled:text-black disabled:opacity-100"
+                                className="text-s text-foreground disabled:bg-muted disabled:text-foreground h-10 disabled:opacity-100"
                                 type="email"
                                 value={user.email}
                                 readOnly
@@ -232,7 +232,7 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
                         {data.subjects.map((subj, idx) => (
                             <div
                                 key={idx}
-                                className="group relative rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-rose-200 hover:shadow-md"
+                                className="group border-border bg-card text-card-foreground relative rounded-lg border p-6 shadow-sm transition-all hover:border-rose-200 hover:shadow-md"
                             >
                                 {/* Subject Number Badge */}
                                 <div className="absolute -top-3 -left-2 rounded bg-rose-500 px-2 py-1 text-xs font-semibold text-white">
@@ -243,7 +243,7 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
                                 {data.subjects.length > 1 && (
                                     <button
                                         onClick={() => removeSubjectRow(idx)}
-                                        className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 shadow-sm transition-all hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
+                                        className="border-border bg-card text-card-foreground absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full border text-gray-400 shadow-sm transition-all hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
                                         title="Remove Subject"
                                         type="button"
                                     >
@@ -389,7 +389,7 @@ export default function CompreExamForm({ open, onOpenChange, onFinish }: Props) 
                             <div>
                                 <div className="mb-2 text-lg font-bold text-rose-700">Subjects & Schedules</div>
                                 <div className="overflow-x-auto">
-                                    <table className="min-w-full rounded-lg border border-rose-300 bg-white">
+                                    <table className="bg-card text-card-foreground min-w-full rounded-lg border border-rose-300">
                                         <thead className="bg-rose-100">
                                             <tr>
                                                 <th className="px-4 py-2 text-left font-semibold text-rose-700">#</th>

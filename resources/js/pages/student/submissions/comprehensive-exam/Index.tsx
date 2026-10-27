@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
-import { CalendarX, GraduationCap, Info, RefreshCcw, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { CalendarX, GraduationCap, Info, Plus, RefreshCcw, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CompreExamForm from './compre-exam-form';
 import DisplayApplication from './display-applications';
@@ -167,9 +167,9 @@ export default function ComprehensiveExamIndex() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Comprehensive Exam" />
             <div className="flex w-full flex-col px-7 pt-5 pb-5">
-                <div className="w-full overflow-hidden rounded-lg border border-zinc-200 bg-white">
+                <div className="bg-card text-card-foreground border-border w-full overflow-hidden rounded-lg border">
                     {/* --- Comprehensive Exam Content --- */}
-                    <div className="flex w-full flex-row items-center justify-between border-b p-3">
+                    <div className="border-border flex w-full flex-col items-start justify-between gap-4 border-b p-5 sm:flex-row sm:items-center">
                         <div className="flex items-center gap-2">
                             <div className="flex h-10 w-10 items-center justify-center rounded-full border border-rose-500 bg-rose-500/10">
                                 <GraduationCap className="h-5 w-5 text-rose-400" />
@@ -177,14 +177,14 @@ export default function ComprehensiveExamIndex() {
                             <div>
                                 <span className="text-base font-semibold">Comprehensive Exam</span>
                                 <p className="text-muted-foreground block text-xs">Submit and track your comprehensive exam application.</p>
-                                <div className="mt-1 flex items-center gap-2">
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
                                     <Badge
                                         variant={canApply ? 'secondary' : 'outline'}
                                         className={
                                             examClosed
-                                                ? 'border-rose-300 bg-rose-50 text-rose-700'
+                                                ? 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
                                                 : canApply
-                                                  ? 'border-green-300 bg-green-50 text-green-700'
+                                                  ? 'border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300'
                                                   : ''
                                         }
                                     >
@@ -222,10 +222,8 @@ export default function ComprehensiveExamIndex() {
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div className="flex flex-col gap-4">
                         <Button
-                            className="rounded-md bg-rose-500 px-5 text-sm"
+                            className="w-full shrink-0 rounded-md bg-rose-500 px-5 text-sm text-white hover:bg-rose-600 sm:w-auto"
                             onClick={() => setOpen(true)}
                             disabled={!canApply || (!!application && hasPending)}
                             title={
@@ -238,8 +236,11 @@ export default function ComprehensiveExamIndex() {
                                         : 'Submit application'
                             }
                         >
+                            <Plus className="mr-1 h-4 w-4" />
                             Submit application
                         </Button>
+                    </div>
+                    <div className="flex flex-col gap-4">
                         <CompreExamForm open={open} onOpenChange={setOpen} />
                         <div>
                             {application ? (
@@ -281,10 +282,10 @@ export default function ComprehensiveExamIndex() {
                                             variant="outline"
                                             className={
                                                 b.ok === true
-                                                    ? 'border-green-300 bg-green-50 text-green-700'
+                                                    ? 'border-green-300 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-300'
                                                     : b.ok === false
-                                                      ? 'border-rose-300 bg-rose-50 text-rose-700'
-                                                      : 'text-zinc-600'
+                                                      ? 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
+                                                      : 'text-muted-foreground'
                                             }
                                         >
                                             {b.ok === true ? 'OK' : b.ok === false ? 'Missing' : 'Unknown'}
