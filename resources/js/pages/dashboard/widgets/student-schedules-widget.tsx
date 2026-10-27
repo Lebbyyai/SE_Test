@@ -91,7 +91,7 @@ export default function StudentSchedulesWidget({ onTodayCount }: { onTodayCount:
 
     return (
         <section
-            aria-label="Student schedules"
+            aria-label="Schedules"
             className="bg-card text-card-foreground grid w-full min-w-0 overflow-hidden rounded-xl lg:grid-cols-[minmax(0,1fr)_380px] dark:bg-zinc-900"
         >
             <div className="min-w-0 p-5 md:p-6">

@@ -7,7 +7,7 @@ import { CalendarDays, ClipboardList, Moon, Sun, Users } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import ImmediateActionDefenseRequestsWidget from '../widgets/immediate-action-defense-requests-widget';
 import QuickActionsWidget from '../widgets/quick-actions-widget';
-import WeeklyDefenseSchedulesWidget from '../widgets/weekly-defense-schedule-widget';
+import SchedulesWidget from '../widgets/student-schedules-widget';
 
 type PageProps = {
     studentsCount?: number;
@@ -40,22 +40,9 @@ export default function AdviserDashboard() {
         studentsCount = 0, // <-- get from props
     } = usePage<PageProps>().props;
 
-    const [allRequests, setAllRequests] = useState<DefenseRequest[]>([]);
     const [immediateRequests, setImmediateRequests] = useState<DefenseRequest[]>([]);
-    const [todayEvents, setTodayEvents] = useState<DefenseRequest[]>([]);
+    const [todayEventCount, setTodayEventCount] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
-
-    const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
-
-    const weekDays = [
-        { label: 'Sun', value: 0 },
-        { label: 'Mon', value: 1 },
-        { label: 'Tue', value: 2 },
-        { label: 'Wed', value: 3 },
-        { label: 'Thu', value: 4 },
-        { label: 'Fri', value: 5 },
-        { label: 'Sat', value: 6 },
-    ];
 
     useEffect(() => {
         fetch('/adviser/defense-requests', {
@@ -64,14 +51,11 @@ export default function AdviserDashboard() {
             .then((res) => res.json())
             .then((data) => {
                 const list = data && data.items ? data.items : [];
-                setAllRequests(list);
                 const needs = list.filter((r: DefenseOverview) => {
                     const wf = (r.workflow_state || '').toLowerCase();
                     return ['', 'submitted', 'pending', 'adviser-pending', 'adviser-review'].includes(wf);
                 });
                 setImmediateRequests(needs);
-                const todayStr = new Date().toISOString().slice(0, 10);
-                setTodayEvents(list.filter((r: DefenseOverview) => r.scheduled_date === todayStr));
             })
             .catch(() => {})
             .finally(() => setLoading(false));
@@ -88,7 +72,7 @@ export default function AdviserDashboard() {
         },
         {
             title: "Today's Schedules",
-            value: todayEvents.length,
+            value: todayEventCount ?? 'Checking...',
             description: 'Events scheduled for today',
             icon: <CalendarDays className="size-5 text-blue-500" />,
             iconTheme: 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300',
@@ -176,14 +160,7 @@ export default function AdviserDashboard() {
                     <div className="mx-2 mt-2 mb-2 flex flex-col gap-4 rounded-lg bg-gray-100 px-3 py-4 md:mx-4 md:gap-6 md:rounded-xl md:px-5 md:py-8 dark:bg-zinc-900">
                         <div className="mb-2 flex w-full flex-col gap-4">
                             <ImmediateActionDefenseRequestsWidget requests={immediateRequests} loading={loading} />
-                            <WeeklyDefenseSchedulesWidget
-                                weekDays={weekDays}
-                                selectedDay={selectedDay}
-                                setSelectedDay={setSelectedDay}
-                                approvedDefenses={allRequests}
-                                referenceDate={new Date()}
-                                loading={loading}
-                            />
+                            <SchedulesWidget onTodayCount={setTodayEventCount} />
                         </div>
                         <div className="grid gap-4 md:grid-cols-2">{/* Add more widgets here if needed */}</div>
                     </div>

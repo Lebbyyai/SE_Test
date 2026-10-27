@@ -20,3 +20,17 @@ test('dashboard calendar feed returns own defenses and school events but exclude
     expect($rows->pluck('title')->all())->toContain('School activity')->toContain('Defense: '.$mine->thesis_title)->not->toContain('Defense: '.$theirs->thesis_title);
     expect($rows->where('origin', 'defense')->count())->toBe(1);
 });
+
+test('adviser dashboard calendar includes assigned defenses and school events without other adviser defenses', function () {
+    $adviser = User::factory()->create(['role' => 'Adviser']);
+    $other = User::factory()->create(['role' => 'Adviser']);
+    $mine = dashboardScheduledDefense(User::factory()->create(['role' => 'Student']));
+    $mine->update(['adviser_user_id' => $adviser->id]);
+    $theirs = dashboardScheduledDefense(User::factory()->create(['role' => 'Student']));
+    $theirs->update(['adviser_user_id' => $other->id]);
+    Event::create(['title' => 'Graduate school event', 'start_at' => '2026-10-27 13:00:00', 'end_at' => '2026-10-27 14:00:00', 'all_day' => false, 'type' => 'general', 'created_by' => $adviser->id]);
+    $response = $this->actingAs($adviser)->getJson('/api/calendar/events?from=2026-10-01&to=2026-10-31')->assertOk();
+    $rows = collect($response->json());
+    expect($rows->pluck('title')->all())->toContain('Graduate school event')->toContain('Defense: '.$mine->thesis_title)->not->toContain('Defense: '.$theirs->thesis_title);
+    expect($rows->where('origin', 'defense')->count())->toBe(1);
+});
