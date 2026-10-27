@@ -206,6 +206,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
 
     /* Payments */
+    Route::redirect('/payments', '/payment')->name('payment.legacy');
     Route::get('/payment', [PaymentSubmissionController::class, 'index'])->name('payment.index');
     Route::post('/payment', [PaymentSubmissionController::class, 'store'])->name('payment.store');
 

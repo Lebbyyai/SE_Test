@@ -14,7 +14,7 @@ const STUDENT_ACTIONS = [
     },
     {
         label: 'Payments',
-        href: '/payments',
+        href: '/payment',
         icon: <Receipt className="size-5 font-extrabold text-zinc-800 dark:text-zinc-100" size={20} />,
     },
     {
@@ -27,12 +27,12 @@ const STUDENT_ACTIONS = [
 const ADMIN_ACTIONS = [
     {
         label: 'Payments',
-        href: '/payments',
+        href: '/coordinator/compre-payment',
         icon: <Receipt className="size-5 font-extrabold text-zinc-800 dark:text-zinc-100" size={20} />,
     },
     {
         label: 'Honorariums',
-        href: '/honorariums',
+        href: '/honorarium-ledger',
         icon: <BadgeDollarSign className="size-5 font-extrabold text-zinc-800 dark:text-zinc-100" size={20} />,
     },
     {
@@ -67,7 +67,19 @@ export default function QuickActionsWidget({ userRole }: Props) {
     if (userRole === 'Adviser') {
         actions = ADVISER_ACTIONS;
     } else if (MANAGE_ROLES.includes(userRole || '')) {
-        actions = ADMIN_ACTIONS;
+        actions = ADMIN_ACTIONS.map((action) =>
+            action.label === 'Payments'
+                ? {
+                      ...action,
+                      href:
+                          userRole === 'Administrative Assistant'
+                              ? '/payment-verifications'
+                              : userRole === 'Dean'
+                                ? '/dean/payment-rates'
+                                : '/coordinator/compre-payment',
+                  }
+                : action,
+        );
     } else {
         actions = STUDENT_ACTIONS;
     }
@@ -79,7 +91,7 @@ export default function QuickActionsWidget({ userRole }: Props) {
                 {actions.map((action) => (
                     <Tooltip key={action.label}>
                         <TooltipTrigger asChild>
-                            <Link href={action.href} className="group flex flex-col items-center gap-1">
+                            <Link href={action.href} aria-label={action.label} className="group flex flex-col items-center gap-1">
                                 <span className="flex h-10 w-10 items-center justify-center">{action.icon}</span>
                             </Link>
                         </TooltipTrigger>
