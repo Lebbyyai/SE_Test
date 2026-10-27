@@ -54,52 +54,25 @@ export default function AssistantDashboard() {
     } = usePage<PageProps>().props;
 
     const [loading, setLoading] = useState(false);
-    const [pendingHonorariums, setPendingHonorariums] = useState<number | null>(stats.pending_honorariums ?? null);
-    const [todaysDefenses, setTodaysDefenses] = useState<number | null>(stats.todays_defenses ?? null);
-    const [pendingApplications, setPendingApplications] = useState<number>(stats.pending_applications ?? 0);
-    const [pendingPayments, setPendingPayments] = useState<number>(stats.pending_payments ?? 0);
-    const [pendingDefenseRequests, setPendingDefenseRequests] = useState<number>(stats.pending_defense_requests ?? 0);
-
+    const pendingHonorariums = stats.pending_honorariums;
+    const todaysDefenses = stats.todays_defenses;
+    const pendingApplications = stats.pending_applications;
+    const pendingPayments = stats.pending_payments;
+    const pendingDefenseRequests = stats.pending_defense_requests;
     const [pendingRequests, setPendingRequests] = useState<DefenseOverview[]>([]);
     useEffect(() => {
-        // If server-side props already include the AA-specific metrics, skip fetching.
-        if (pendingHonorariums !== null && todaysDefenses !== null) return;
-
         setLoading(true);
-        Promise.all([
-            fetch('/api/pending-honorariums')
-                .then((res) => (res.ok ? res.json() : { count: 0 }))
-                .catch(() => ({ count: 0 })),
-            fetch('/api/todays-defenses')
-                .then((res) => (res.ok ? res.json() : { count: 0 }))
-                .catch(() => ({ count: 0 })),
-            fetch('/api/pending-applications')
-                .then((res) => (res.ok ? res.json() : { count: 0 }))
-                .catch(() => ({ count: 0 })),
-            fetch('/api/pending-payments')
-                .then((res) => (res.ok ? res.json() : { count: 0 }))
-                .catch(() => ({ count: 0 })),
-            fetch('/api/pending-defense-requests')
-                .then((res) => (res.ok ? res.json() : { count: 0 }))
-                .catch(() => ({ count: 0 })),
-            fetch('/defense-requests', { headers: { Accept: 'application/json' } })
-                .then((res) => (res.ok ? res.json() : []))
-                .catch(() => []),
-        ])
-            .then(([honorariums, defenses, applications, payments, defenseRequests, allDefenseRequests]) => {
-                setPendingHonorariums(honorariums.count ?? 0);
-                setTodaysDefenses(defenses.count ?? 0);
-                setPendingApplications(applications.count ?? 0);
-                setPendingPayments(payments.count ?? 0);
-                setPendingDefenseRequests(defenseRequests.count ?? 0);
-
-                const requests = Array.isArray(allDefenseRequests) ? allDefenseRequests : (allDefenseRequests.defenseRequests ?? []);
-
-                const pending = requests.filter((r: DefenseOverview) => (r.normalized_status || r.status) === 'Pending');
-                setPendingRequests(pending);
+        fetch('/defense-requests', { headers: { Accept: 'application/json' } })
+            .then((res) => {
+                if (!res.ok) throw new Error('Unable to load defense requests');
+                return res.json();
             })
+            .then((data) => {
+                const requests = Array.isArray(data) ? data : (data.defenseRequests ?? []);
+                setPendingRequests(requests.filter((r: DefenseOverview) => (r.normalized_status || r.status) === 'Pending'));
+            })
+            .catch(() => setPendingRequests([]))
             .finally(() => setLoading(false));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const [tab, setTab] = useState('overview');
@@ -107,7 +80,7 @@ export default function AssistantDashboard() {
     const metrics = [
         {
             title: 'Pending Honorariums',
-            value: pendingHonorariums ?? 0,
+            value: pendingHonorariums ?? 'Unavailable',
             description: 'Honorariums not yet processed',
             icon: <DollarSign />,
             iconTheme: 'bg-rose-100 text-rose-600 dark:bg-rose-900 dark:text-rose-300',
@@ -115,7 +88,7 @@ export default function AssistantDashboard() {
         },
         {
             title: "Today's Defense Schedules",
-            value: todaysDefenses ?? 0,
+            value: todaysDefenses ?? 'Unavailable',
             description: 'Defenses scheduled for today',
             icon: <CalendarDays />,
             iconTheme: 'bg-violet-100 text-violet-600 dark:bg-violet-900 dark:text-violet-300',

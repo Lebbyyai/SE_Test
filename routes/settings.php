@@ -61,7 +61,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Coordinator: defense submissions
         $acceptDefense = null;
         if ($role === 'Coordinator') {
-            $acceptDefense = \DB::table('settings')->where('key', 'accept_defense')->value('value');
+            $acceptDefense = DB::table('settings')->where('key', 'accept_defense')->value('value');
             $acceptDefense = $acceptDefense === null ? true : $acceptDefense === '1';
         }
 
@@ -69,7 +69,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $autoAccept = null;
         $adviserCode = null;
         if (in_array($role, ['Adviser'])) {
-            $autoAccept = \DB::table('adviser_settings')->where('adviser_id', Auth::id())->value('auto_accept_students');
+            $autoAccept = DB::table('adviser_settings')->where('adviser_id', Auth::id())->value('auto_accept_students');
             $autoAccept = $autoAccept === null ? false : $autoAccept == 1;
             $adviserCode = Auth::user()->adviser_code;
         }
@@ -85,7 +85,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/api/settings/general', function (Request $request) {
         abort_unless(Auth::user()->role === 'Coordinator', 403);
         $accept = $request->input('acceptDefense') ? '1' : '0';
-        \DB::table('settings')->updateOrInsert(
+        DB::table('settings')->updateOrInsert(
             ['key' => 'accept_defense'],
             ['value' => $accept]
         );
@@ -109,7 +109,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $user = Auth::user();
         abort_unless(in_array($user->role, ['Adviser']), 403);
         $autoAccept = $request->input('autoAccept') ? 1 : 0;
-        \DB::table('adviser_settings')->updateOrInsert(
+        DB::table('adviser_settings')->updateOrInsert(
             ['adviser_id' => $user->id],
             ['auto_accept_students' => $autoAccept]
         );
@@ -121,7 +121,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $user = Auth::user();
         abort_unless(in_array($user->role, ['Adviser']), 403);
 
-        $autoAccept = \DB::table('adviser_settings')->where('adviser_id', $user->id)->value('auto_accept_students');
+        $autoAccept = DB::table('adviser_settings')->where('adviser_id', $user->id)->value('auto_accept_students');
         $autoAccept = $autoAccept === null ? false : $autoAccept == 1;
 
         return Inertia::render('settings/adviser', [

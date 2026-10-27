@@ -1,19 +1,26 @@
 <?php
 
+use App\Helpers\ProgramLevel;
 use App\Models\DefenseRequest;
+use App\Models\DefenseServiceRecord;
 use App\Models\FinanceDocumentSubmission;
 use App\Models\HonorariumActivity;
+use App\Models\HonorariumDisbursement;
 use App\Models\Notification;
 use App\Models\User;
+use App\Services\DefenseServiceConfirmation;
 use App\Services\FinanceDocumentWorkflowService;
+use App\Services\HonorariumLedgerService;
+use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\TestCase;
 
-uses(Tests\TestCase::class);
+uses(TestCase::class);
 beforeEach(function () {
     $this->withoutVite();
     Schema::create('users', function (Blueprint $t) {
@@ -72,7 +79,7 @@ beforeEach(function () {
     DB::table('panelists')->insert(['id' => 1, 'name' => 'Demo Person', 'email' => 'user4@example.test']);
     Mail::fake();
     Http::preventStrayRequests();
-    $this->travelTo(\Carbon\Carbon::parse('2026-10-24 08:00:00', 'Asia/Manila'));
+    $this->travelTo(Carbon::parse('2026-10-24 08:00:00', 'Asia/Manila'));
 });
 afterEach(function () {
     $this->travelBack();
@@ -111,7 +118,7 @@ it('unlocks once on the next Philippine calendar day', function () {
     sendIntegratedReceipt($d);
     $service = app(FinanceDocumentWorkflowService::class);
     expect($service->unlockDueDocuments())->toBe(0);
-    $this->travelTo(\Carbon\Carbon::parse('2026-10-25 00:01:00', 'Asia/Manila'));
+    $this->travelTo(Carbon::parse('2026-10-25 00:01:00', 'Asia/Manila'));
     expect($service->unlockDueDocuments())->toBe(1)->and($service->unlockDueDocuments())->toBe(0)->and(HonorariumActivity::where('activity_type', 'document_ready')->count())->toBe(1);
 });
 it('requires a verified receipt and current panelists before sending the breakdown', function () {
@@ -178,31 +185,31 @@ function verifiedLedgerDefense(): DefenseRequest
         DB::table('payment_rates')->insert(['program_level' => 'Masteral', 'type' => $type, 'defense_type' => 'Proposal', 'amount' => $amount]);
     }
 
-    $service = app(\App\Services\DefenseServiceConfirmation::class);
-    \App\Models\DefenseServiceRecord::create(['defense_request_id' => $d->id, 'snapshot_hash' => $service->snapshot($d), 'participants' => array_map(fn ($person) => $person + ['affiliation' => $person['recipient_role'] === 'Adviser' ? null : 'internal', 'attendance' => 'rendered'], app(\App\Services\HonorariumLedgerService::class)->recipients($d)), 'completed_on' => '2026-10-23', 'confirmed_by' => 5, 'confirmed_at' => now(), 'history' => []]);
+    $service = app(DefenseServiceConfirmation::class);
+    DefenseServiceRecord::create(['defense_request_id' => $d->id, 'snapshot_hash' => $service->snapshot($d), 'participants' => array_map(fn ($person) => $person + ['affiliation' => $person['recipient_role'] === 'Adviser' ? null : 'internal', 'attendance' => 'rendered'], app(HonorariumLedgerService::class)->recipients($d)), 'completed_on' => '2026-10-23', 'confirmed_by' => 5, 'confirmed_at' => now(), 'history' => []]);
 
     return $d;
 }
 it('prepares immutable recipient amounts from Dean rates without duplicates', function () {
     $d = verifiedLedgerDefense();
     $this->actingAs(User::find(2))->postJson('/honorarium-ledger/'.$d->id.'/prepare', ['school_year' => '2026-2027', 'semester' => '1st'])->assertOk();
-    $rows = \App\Models\HonorariumDisbursement::all();
+    $rows = HonorariumDisbursement::all();
     expect($rows)->toHaveCount(2)->and((float) $rows->sum('amount'))->toBe(2500.0);
     DB::table('payment_rates')->update(['amount' => 999]);
     expect((float) $rows->first()->fresh()->amount)->toBe(1500.0);
     $this->postJson('/honorarium-ledger/'.$d->id.'/prepare', ['school_year' => '2026-2027', 'semester' => '1st'])->assertUnprocessable();
-    expect(\App\Models\HonorariumDisbursement::count())->toBe(2);
+    expect(HonorariumDisbursement::count())->toBe(2);
 });
 it('rolls back every prepared payment when one recipient has no rate', function () {
     $d = verifiedLedgerDefense();
     DB::table('payment_rates')->where('type', 'Adviser')->delete();
     $this->actingAs(User::find(2))->postJson('/honorarium-ledger/'.$d->id.'/prepare', ['school_year' => '2026-2027', 'semester' => '1st'])->assertUnprocessable();
-    expect(\App\Models\HonorariumDisbursement::count())->toBe(0);
+    expect(HonorariumDisbursement::count())->toBe(0);
 });
 it('records Finance approval disbursement and claiming in order with history', function () {
     $d = verifiedLedgerDefense();
     $this->actingAs(User::find(2))->postJson('/honorarium-ledger/'.$d->id.'/prepare', ['school_year' => '2026-2027', 'semester' => '1st']);
-    $row = \App\Models\HonorariumDisbursement::first();
+    $row = HonorariumDisbursement::first();
     $this->patchJson('/honorarium-ledger/'.$row->id, ['status' => 'approved'])->assertForbidden();
     $this->actingAs(User::find(3))->patchJson('/honorarium-ledger/'.$row->id, ['status' => 'claimed', 'event_date' => '2026-10-24'])->assertUnprocessable();
     $this->patchJson('/honorarium-ledger/'.$row->id, ['status' => 'approved'])->assertOk();
@@ -217,7 +224,7 @@ it('records Finance approval disbursement and claiming in order with history', f
 it('invalidates changed Finance snapshots and preserves paid history for review', function () {
     $d = verifiedLedgerDefense();
     $this->actingAs(User::find(2))->postJson('/honorarium-ledger/'.$d->id.'/prepare', ['school_year' => '2026-2027', 'semester' => '1st']);
-    $rows = \App\Models\HonorariumDisbursement::get();
+    $rows = HonorariumDisbursement::get();
     $rows[0]->update(['status' => 'disbursed', 'disbursed_on' => '2026-10-24', 'payment_reference' => 'TEST-EXISTING']);
     $d->update(['proof_of_payment' => 'replacement.pdf']);
     expect(FinanceDocumentSubmission::where('status', 'rejected')->count())->toBe(2)->and($rows[0]->fresh()->requires_review)->toBeTrue()->and($rows[0]->fresh()->status)->toBe('disbursed')->and($rows[1]->fresh()->status)->toBe('voided');
@@ -297,7 +304,7 @@ it('resolves registered adviser choices to panel records without confusing user 
     $this->actingAs(User::find(1))->getJson('/api/defense-request/'.$d->id)->assertOk()->assertJsonPath('defense_chairperson', 'Demo Person');
 });
 it('uses the correct program level for honorarium rates', function ($program, $expected) {
-    expect(\App\Helpers\ProgramLevel::getLevel($program))->toBe($expected);
+    expect(ProgramLevel::getLevel($program))->toBe($expected);
 })->with([
     ['Master in Business Administration', 'Masteral'],
     ['Master of Arts in Educational Management', 'Masteral'],

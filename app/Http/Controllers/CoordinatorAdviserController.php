@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Api\StudentSearchController;
 use App\Mail\AdviserInvitation;
+use App\Mail\StudentAssignedToAdviser;
 use App\Models\Adviser;
 use App\Models\User;
+use App\Services\AdviserAssignmentNotifications;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -318,7 +321,7 @@ class CoordinatorAdviserController extends Controller
         if ($adviser->user_id) {
             $adviserUser = User::find($adviser->user_id);
             if ($adviserUser) {
-                $adviserUser->advisedStudents()->detach();
+                $adviserUser->advisedStudents()->wherePivot('requested_by', $coordinator->id)->detach();
             }
         }
 
@@ -503,13 +506,13 @@ class CoordinatorAdviserController extends Controller
         ]);
 
         $pendingStudent = $adviserUser->advisedStudents()->whereKey($student->id)->firstOrFail();
-        app(\App\Services\AdviserAssignmentNotifications::class)->pending($adviserUser, $student, (string) $pendingStudent->pivot->updated_at);
+        app(AdviserAssignmentNotifications::class)->pending($adviserUser, $student, (string) $pendingStudent->pivot->updated_at);
 
         // In-app notifications are always created; email is optional.
         try {
             if ($request->boolean('send_email') && $adviserUser->email) {
                 Mail::to($adviserUser->email)
-                    ->send(new \App\Mail\StudentAssignedToAdviser($adviserUser, $student, $coordinator));
+                    ->send(new StudentAssignedToAdviser($adviserUser, $student, $coordinator));
 
                 Log::info('Student Assignment: Email sent to adviser', [
                     'adviser_id' => $adviserUser->id,
@@ -554,7 +557,7 @@ class CoordinatorAdviserController extends Controller
             return response()->json(['error' => 'Student not found.'], 404);
         }
 
-        $adviserUser->advisedStudents()->detach($student->id);
+        $adviserUser->advisedStudents()->wherePivot('requested_by', $coordinator->id)->detach($student->id);
 
         return response()->json(['success' => true]);
     }
@@ -562,6 +565,45 @@ class CoordinatorAdviserController extends Controller
     // Return all advisers in the database
     public function all()
     {
-        return response()->json(\App\Models\Adviser::all());
+        return response()->json(Adviser::all());
+    }
+
+    public function getCoordinatorCode(Request $request)
+    {
+        abort_unless($request->user()->role === 'Coordinator', 403);
+        $user = $request->user();
+        if (! $user->coordinator_code) {
+            $user->generateCoordinatorCode();
+        }
+
+        return response()->json(['coordinator_code' => $user->coordinator_code]);
+    }
+
+    public function registerWithCode(Request $request)
+    {
+        abort_unless($request->user()->role === 'Adviser', 403);
+        $data = $request->validate(['coordinator_code' => 'required|string|max:255']);
+        $coordinator = User::where('role', 'Coordinator')->where('coordinator_code', $data['coordinator_code'])->firstOrFail();
+        $request->user()->coordinators()->syncWithoutDetaching([$coordinator->id]);
+        Adviser::firstOrCreate(['coordinator_id' => $coordinator->id, 'email' => $request->user()->email], [
+            'user_id' => $request->user()->id, 'first_name' => $request->user()->first_name,
+            'last_name' => $request->user()->last_name, 'status' => 'active',
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function getRegisteredCoordinator(Request $request)
+    {
+        abort_unless($request->user()->role === 'Adviser', 403);
+
+        return response()->json(['coordinators' => $request->user()->coordinators()->get(['users.id', 'users.first_name', 'users.last_name', 'users.email'])]);
+    }
+
+    public function searchStudents(Request $request)
+    {
+        abort_unless($request->user()->role === 'Coordinator', 403);
+
+        return app(StudentSearchController::class)->search($request);
     }
 }

@@ -103,9 +103,9 @@ class ScheduleEventController extends Controller
         ]);
 
         $tz = config('app.timezone', 'Asia/Manila');
-        $start = \Carbon\Carbon::parse($data['start'], $tz);
+        $start = Carbon::parse($data['start'], $tz);
         $end = isset($data['end'])
-            ? \Carbon\Carbon::parse($data['end'], $tz)
+            ? Carbon::parse($data['end'], $tz)
             : (clone $start);
 
         $ev = Event::create([

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DefenseRequest;
 use App\Models\Panelist;
+use App\Services\DefenseConflictService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -100,10 +101,10 @@ class DefenseScheduleController extends Controller
         $dr->scheduled_time = $data['time'];
         $dr->scheduled_end_time = $data['end_time'] ?? Carbon::parse($data['time'])->addHour()->format('H:i');
         $dr->defense_venue = $data['venue'] ?? null;
-        foreach (\App\Services\DefenseConflictService::PANEL_FIELDS as $i => $field) {
+        foreach (DefenseConflictService::PANEL_FIELDS as $i => $field) {
             $dr->{$field} = $data['panels'][$i] ?? null;
         }
-        $service = app(\App\Services\DefenseConflictService::class);
+        $service = app(DefenseConflictService::class);
         $conflicts = $service->findPanelSchedulingConflicts($dr, [], $data['date'], $data['time'], $dr->scheduled_end_time);
         if ($service->hasVenueConflict($dr, $dr->defense_venue, $data['date'], $data['time'], $dr->scheduled_end_time)) {
             $conflicts[] = ['type' => 'venue', 'message' => 'The venue has an overlapping booking.'];
@@ -119,7 +120,7 @@ class DefenseScheduleController extends Controller
         $dr = new DefenseRequest;
         $dr->id = $data['exclude_id'] ?? 0;
         $end = $data['end_time'] ?? Carbon::parse($data['time'])->addHour()->format('H:i');
-        $service = app(\App\Services\DefenseConflictService::class);
+        $service = app(DefenseConflictService::class);
         $busy = [];
         foreach ($service->overlapping($dr, $data['date'], $data['time'], $end) as $other) {
             $busy = array_merge($busy, array_keys($service->people($other)));

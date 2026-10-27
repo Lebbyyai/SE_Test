@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\DefenseRequest;
 use App\Models\DocumentTemplate;
 use App\Models\GeneratedDocument;
+use App\Models\User;
 use App\Models\UserSignature;
 use Illuminate\Support\Facades\Storage;
 use setasign\Fpdi\Fpdi;
@@ -177,7 +178,7 @@ class DocumentGenerator
         $map = [
             'signature.adviser' => $r->adviser_user_id ?? null,
             'signature.coordinator' => $r->coordinator_user_id ?? null,
-            'signature.dean' => \App\Models\User::where('role', 'Dean')->value('id'),
+            'signature.dean' => User::where('role', 'Dean')->value('id'),
         ];
 
         $uid = $map[$key] ?? null;

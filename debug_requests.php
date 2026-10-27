@@ -3,10 +3,12 @@
 require_once __DIR__.'/vendor/autoload.php';
 
 $app = require_once __DIR__.'/bootstrap/app.php';
-$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
 use App\Models\DefenseRequest;
 use App\Models\User;
+use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\Auth;
 
 echo "=== DEFENSE REQUEST ANALYSIS ===\n\n";
 
@@ -28,8 +30,8 @@ foreach ($adviser as $f) {
 }
 
 echo "\n3. CURRENT USER (if logged in):\n";
-if (\Illuminate\Support\Facades\Auth::check()) {
-    $user = \Illuminate\Support\Facades\Auth::user();
+if (Auth::check()) {
+    $user = Auth::user();
     echo "   ID: {$user->id} | Name: {$user->first_name} {$user->last_name} | Role: {$user->role}\n";
 } else {
     echo "   No user currently logged in.\n";

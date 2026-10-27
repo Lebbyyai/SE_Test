@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Facades\Event;
+
 test('registration screen can be rendered', function () {
     $response = $this->get('/register');
 
@@ -8,7 +10,7 @@ test('registration screen can be rendered', function () {
 
 test('new users can register', function () {
 
-    \Illuminate\Support\Facades\Event::fake();
+    Event::fake();
 
     $response = $this->post('/register', [
         'first_name' => 'Test',

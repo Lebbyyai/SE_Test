@@ -1,8 +1,12 @@
 <?php
 
+use App\Mail\StudentAcceptedByAdviser;
+use App\Mail\StudentAssignedToAdviser;
+use App\Mail\StudentRejectedByAdviser;
 use App\Models\Adviser;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
+use Inertia\Testing\AssertableInertia;
 
 beforeEach(function () {
     $this->withoutVite();
@@ -56,7 +60,7 @@ test('assignment always notifies both users in app and emails only when selected
             Mail::assertNothingSent();
         }
     }
-    Mail::assertSent(\App\Mail\StudentAssignedToAdviser::class, 1);
+    Mail::assertSent(StudentAssignedToAdviser::class, 1);
 });
 
 test('existing pending assignments recover notices once and dashboard distinguishes pending from accepted', function () {
@@ -69,7 +73,7 @@ test('existing pending assignments recover notices once and dashboard distinguis
     $this->actingAs($student)->getJson('/notifications/feed')->assertOk()->assertJsonPath('unreadCount', 1);
     $this->getJson('/notifications/feed')->assertOk()->assertJsonPath('unreadCount', 1);
     $this->assertDatabaseCount('notifications', 2);
-    $this->get('/dashboard')->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page->has('auth.user.pendingAdvisers', 1)->has('auth.user.advisers', 0));
+    $this->get('/dashboard')->assertInertia(fn (AssertableInertia $page) => $page->has('auth.user.pendingAdvisers', 1)->has('auth.user.advisers', 0));
     Mail::assertNothingSent();
 });
 
@@ -88,7 +92,7 @@ test('adviser decision notifies the student and coordinator and cannot be replay
     }
     $this->postJson($url)->assertNotFound();
     $this->assertDatabaseCount('notifications', 2);
-    $this->actingAs($student)->get('/dashboard')->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page->has('auth.user.pendingAdvisers', 0)->has('auth.user.advisers', $status === 'accepted' ? 1 : 0));
+    $this->actingAs($student)->get('/dashboard')->assertInertia(fn (AssertableInertia $page) => $page->has('auth.user.pendingAdvisers', 0)->has('auth.user.advisers', $status === 'accepted' ? 1 : 0));
 })->with([
     ['accept', 'accepted', 'Adviser assignment accepted'],
     ['reject', 'rejected', 'Adviser assignment declined'],
@@ -109,10 +113,10 @@ test('adviser email choice does not change the decision or in-app notices', func
         Mail::assertNothingSent();
     }
 })->with([
-    ['accept', \App\Mail\StudentAcceptedByAdviser::class, false],
-    ['accept', \App\Mail\StudentAcceptedByAdviser::class, true],
-    ['reject', \App\Mail\StudentRejectedByAdviser::class, false],
-    ['reject', \App\Mail\StudentRejectedByAdviser::class, true],
+    ['accept', StudentAcceptedByAdviser::class, false],
+    ['accept', StudentAcceptedByAdviser::class, true],
+    ['reject', StudentRejectedByAdviser::class, false],
+    ['reject', StudentRejectedByAdviser::class, true],
 ]);
 
 test('invalid email choice cannot update a pending assignment', function () {

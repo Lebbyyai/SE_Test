@@ -3,10 +3,11 @@
 require_once __DIR__.'/vendor/autoload.php';
 
 $app = require_once __DIR__.'/bootstrap/app.php';
-$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
 use App\Models\DefenseRequest;
 use App\Models\User;
+use Illuminate\Contracts\Console\Kernel;
 
 echo "Testing Defense Request Creation...\n";
 
@@ -74,7 +75,7 @@ try {
         echo "Adviser user not found\n";
     }
 
-} catch (\Exception $e) {
+} catch (Exception $e) {
     echo 'Error creating defense request: '.$e->getMessage()."\n";
     echo "Stack trace:\n".$e->getTraceAsString()."\n";
 }

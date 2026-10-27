@@ -1,17 +1,19 @@
 <?php
 
 use App\Models\User;
+use App\Services\ComprehensiveEligibilityService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\TestCase;
 
-uses(Tests\TestCase::class);
+uses(TestCase::class);
 beforeEach(function () {
     $this->withoutVite();
     Http::preventStrayRequests();
-    $this->mock(\App\Services\ComprehensiveEligibilityService::class)->shouldReceive('check')->andReturn(['eligible' => true]);
+    $this->mock(ComprehensiveEligibilityService::class)->shouldReceive('check')->andReturn(['eligible' => true]);
     Schema::create('users', function (Blueprint $t) {
         $t->id();
         foreach (['first_name', 'last_name', 'school_id', 'role', 'email', 'program'] as $f) {
@@ -85,7 +87,7 @@ it('does not allow Finance to submit a student exam application', function () {
 });
 
 it('enforces eligibility on the server even if a client bypasses the disabled button', function () {
-    $this->mock(\App\Services\ComprehensiveEligibilityService::class)->shouldReceive('check')->andReturn(['eligible' => false]);
+    $this->mock(ComprehensiveEligibilityService::class)->shouldReceive('check')->andReturn(['eligible' => false]);
     $this->actingAs(User::find(1))->postJson('/comprehensive-exam', integratedExamData())->assertUnprocessable()->assertJsonValidationErrors('eligibility');
     expect(DB::table('exam_application')->count())->toBe(0);
 });

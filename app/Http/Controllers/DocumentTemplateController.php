@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DefenseRequest;
 use App\Models\DocumentTemplate;
+use App\Services\DocumentGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -75,11 +76,15 @@ class DocumentTemplateController extends Controller
             'fields' => 'array',
         ]);
 
-        $template = \App\Models\DocumentTemplate::findOrFail($request->template_id);
-        $defenseRequest = \App\Models\DefenseRequest::findOrFail($request->defense_request_id);
+        $template = DocumentTemplate::findOrFail($request->template_id);
+        $defenseRequest = DefenseRequest::findOrFail($request->defense_request_id);
+
+        $user = $request->user();
+        abort_unless($user && (in_array($user->role, ['Dean', 'Super Admin'], true)
+            || ($user->role === 'Adviser' && (int) $defenseRequest->adviser_user_id === (int) $user->id)), 403);
 
         // You may want to merge $request->fields into the defenseRequest data for the generator
-        $generator = new \App\Services\DocumentGenerator;
+        $generator = new DocumentGenerator;
         try {
             $generated = $generator->generate($template, $defenseRequest, $request->fields ?? []);
         } catch (\Throwable $e) {

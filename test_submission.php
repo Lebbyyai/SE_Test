@@ -3,11 +3,13 @@
 require_once __DIR__.'/vendor/autoload.php';
 
 $app = require_once __DIR__.'/bootstrap/app.php';
-$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
 use App\Http\Controllers\DefenseRequestController;
 use App\Models\User;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Http\Request;
+use Illuminate\Http\Testing\File;
 use Illuminate\Support\Facades\Auth;
 
 echo "=== TESTING DEFENSE REQUEST SUBMISSION ===\n\n";
@@ -79,8 +81,8 @@ try {
     $request->query->set('json', '1');
 
     // Mock file uploads
-    $uploadedFile1 = new \Illuminate\Http\Testing\File('rec_endorsement.pdf', fopen($testFile1, 'r'));
-    $uploadedFile2 = new \Illuminate\Http\Testing\File('proof_payment.pdf', fopen($testFile2, 'r'));
+    $uploadedFile1 = new File('rec_endorsement.pdf', fopen($testFile1, 'r'));
+    $uploadedFile2 = new File('proof_payment.pdf', fopen($testFile2, 'r'));
 
     $request->files->set('recEndorsement', $uploadedFile1);
     $request->files->set('proofOfPayment', $uploadedFile2);
@@ -90,7 +92,7 @@ try {
     echo 'Response Status: '.$response->getStatusCode()."\n";
     echo 'Response Content: '.$response->getContent()."\n";
 
-} catch (\Exception $e) {
+} catch (Exception $e) {
     echo 'ERROR: '.$e->getMessage()."\n";
     echo "Stack trace:\n".$e->getTraceAsString()."\n";
 }

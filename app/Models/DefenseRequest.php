@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Services\CoordinatorProgramService;
+use App\Services\DefenseConflictService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -90,7 +92,7 @@ class DefenseRequest extends Model
     public function getPanelDisplayAttribute(): array
     {
         $names = [];
-        foreach (\App\Services\DefenseConflictService::PANEL_FIELDS as $field) {
+        foreach (DefenseConflictService::PANEL_FIELDS as $field) {
             $value = $this->{$field};
             $panel = $value && is_numeric($value) ? Panelist::find($value) : null;
             $names[$field] = $panel?->name ?? $value;
@@ -316,7 +318,7 @@ class DefenseRequest extends Model
             }
 
             // If $panel['id'] is a name, convert to panelist ID
-            $panelist = \App\Models\Panelist::where('name', $panel['id'])->first();
+            $panelist = Panelist::where('name', $panel['id'])->first();
             if (! $panelist) {
                 continue;
             } // skip if not found
@@ -331,13 +333,13 @@ class DefenseRequest extends Model
                 continue;
             }
 
-            $spec = \App\Models\PanelistHonorariumSpec::where('role', $panel['role'])
+            $spec = PanelistHonorariumSpec::where('role', $panel['role'])
                 ->where('defense_type', $defenseType)
                 ->first();
 
             $amount = $spec ? $spec->amount : 0;
 
-            \App\Models\HonorariumPayment::create([
+            HonorariumPayment::create([
                 'defense_request_id' => $this->id,
                 'panelist_id' => $panelist->id,
                 'panelist_type' => 'Panelist',
@@ -458,11 +460,11 @@ class DefenseRequest extends Model
         ?string $notes = null
     ): self {
         // PRIORITY 1: Check database for coordinator assignment
-        $coordinator = \App\Models\CoordinatorProgramAssignment::getCoordinatorForProgram($program);
+        $coordinator = CoordinatorProgramAssignment::getCoordinatorForProgram($program);
 
         // FALLBACK: Use CoordinatorProgramService if no database assignment found
         if (! $coordinator) {
-            $coordinatorEmail = \App\Services\CoordinatorProgramService::getCoordinatorByProgram($program);
+            $coordinatorEmail = CoordinatorProgramService::getCoordinatorByProgram($program);
 
             if (! $coordinatorEmail) {
                 Log::warning('No coordinator found for program in database or service', [

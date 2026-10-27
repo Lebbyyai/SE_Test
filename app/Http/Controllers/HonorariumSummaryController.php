@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DefenseRequest;
 use App\Models\ProgramRecord;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -15,10 +16,10 @@ class HonorariumSummaryController extends Controller
         \Log::info('HonorariumSummaryController@index CALLED');
 
         // Get all programs
-        $programs = \App\Models\ProgramRecord::all();
+        $programs = ProgramRecord::all();
 
         // Get all defense requests with payments
-        $defenseRequests = \App\Models\DefenseRequest::with(['honorariumPayments', 'user'])->get();
+        $defenseRequests = DefenseRequest::with(['honorariumPayments', 'user'])->get();
 
         // Group payments by program
         $records = [];
@@ -60,7 +61,7 @@ class HonorariumSummaryController extends Controller
     {
         abort_unless(in_array(auth()->user()?->role, ['Administrative Assistant', 'Dean', 'Super Admin']), 403);
         // Get all defense requests for this program
-        $defenseRequests = \App\Models\DefenseRequest::where('program', $record->program)->get();
+        $defenseRequests = DefenseRequest::where('program', $record->program)->get();
 
         // Collect all honorarium payments for these defense requests
         $payments = [];

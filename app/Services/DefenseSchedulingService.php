@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\DefenseRequest;
+use App\Models\Panelist;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
@@ -38,10 +40,10 @@ class DefenseSchedulingService
                         if (! $u) {
                             throw ValidationException::withMessages([$field => 'Select a registered adviser or panelist.']);
                         }
-                        $panel = \App\Models\Panelist::firstOrCreate(['email' => $u->email], ['name' => $u->full_name, 'role' => 'Panel Member', 'status' => 'Not Assigned']);
+                        $panel = Panelist::firstOrCreate(['email' => $u->email], ['name' => $u->full_name, 'role' => 'Panel Member', 'status' => 'Not Assigned']);
                     } else {
                         $id = preg_replace('/^panelist-/', '', $value);
-                        $matches = is_numeric($id) ? \App\Models\Panelist::whereKey($id)->get() : \App\Models\Panelist::where('name', $value)->get();
+                        $matches = is_numeric($id) ? Panelist::whereKey($id)->get() : Panelist::where('name', $value)->get();
                         if ($matches->count() !== 1) {
                             throw ValidationException::withMessages([$field => 'Select an identifiable registered panelist.']);
                         }
@@ -56,7 +58,7 @@ class DefenseSchedulingService
                 if (! $dr->defense_chairperson || ! $dr->defense_panelist1) {
                     throw ValidationException::withMessages(['panelists' => 'Assign a chairperson and at least one panel member before scheduling.']);
                 }
-                if (\Carbon\CarbonImmutable::parse($dr->scheduled_date->format('Y-m-d').' '.$dr->scheduled_time, 'Asia/Manila') <= \Carbon\CarbonImmutable::now('Asia/Manila')) {
+                if (CarbonImmutable::parse($dr->scheduled_date->format('Y-m-d').' '.$dr->scheduled_time, 'Asia/Manila') <= CarbonImmutable::now('Asia/Manila')) {
                     throw ValidationException::withMessages(['scheduled_date' => 'Choose a future date and time in Philippine time.']);
                 }
                 $dr->workflow_state = 'scheduled';

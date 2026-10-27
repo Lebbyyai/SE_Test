@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Notification;
+use App\Services\AdviserAssignmentNotifications;
+use App\Services\DefenseReminderService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -10,8 +12,8 @@ class NotificationController extends Controller
 {
     public function index(Request $request)
     {
-        app(\App\Services\DefenseReminderService::class)->send($request->user());
-        app(\App\Services\AdviserAssignmentNotifications::class)->syncPending($request->user());
+        app(DefenseReminderService::class)->send($request->user());
+        app(AdviserAssignmentNotifications::class)->syncPending($request->user());
         $notifications = Notification::where('user_id', $request->user()->id)
             ->latest()->get();
 
@@ -45,8 +47,8 @@ class NotificationController extends Controller
 
     public function feed(Request $request)
     {
-        app(\App\Services\DefenseReminderService::class)->send($request->user());
-        app(\App\Services\AdviserAssignmentNotifications::class)->syncPending($request->user());
+        app(DefenseReminderService::class)->send($request->user());
+        app(AdviserAssignmentNotifications::class)->syncPending($request->user());
         $query = Notification::where('user_id', $request->user()->id);
 
         return response()->json([

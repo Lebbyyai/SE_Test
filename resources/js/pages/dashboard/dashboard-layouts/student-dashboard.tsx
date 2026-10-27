@@ -133,9 +133,9 @@ export default function StudentDashboard() {
             iconTheme: 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300',
         },
         {
-            title: 'Recent Payment',
+            title: 'Latest Submitted Payment',
             value: `₱${recentPaymentAmount.toLocaleString()}`,
-            description: 'Most recent payment made',
+            description: 'Latest receipt submitted for verification',
             icon: <BadgeDollarSign />,
             iconTheme: 'bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-300',
         },

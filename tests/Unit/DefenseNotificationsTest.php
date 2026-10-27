@@ -1,5 +1,7 @@
 <?php
 
+use App\Jobs\SendDefenseCountdownEmail;
+use App\Mail\DefenseCountdownReminder;
 use App\Models\DefenseRequest;
 use App\Models\Notification;
 use App\Models\User;
@@ -7,9 +9,12 @@ use App\Services\DefenseReminderService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
 
-uses(Tests\TestCase::class);
+uses(TestCase::class);
 beforeEach(function () {
     Schema::create('users', function (Blueprint $t) {
         $t->id();
@@ -133,22 +138,22 @@ it('requires an accepted assignment and resolves its adviser when the form omits
 });
 it('queues one optional countdown email and skips it after cancellation', function () {
     config(['defense-notifications.email_enabled' => true]);
-    \Illuminate\Support\Facades\Queue::fake();
-    \Illuminate\Support\Facades\Mail::fake();
+    Queue::fake();
+    Mail::fake();
     $r = notificationDefense(['workflow_state' => 'scheduled', 'scheduled_date' => '2026-10-26', 'scheduled_time' => '13:00:00']);
     $service = app(DefenseReminderService::class);
     $service->send();
     $service->send();
-    \Illuminate\Support\Facades\Queue::assertPushed(\App\Jobs\SendDefenseCountdownEmail::class, 1);
+    Queue::assertPushed(SendDefenseCountdownEmail::class, 1);
     $notice = Notification::where('type', 'defense-reminder')->first();
-    $job = new \App\Jobs\SendDefenseCountdownEmail($notice->id, '2026-10-23', '2026-10-26', '13:00:00');
+    $job = new SendDefenseCountdownEmail($notice->id, '2026-10-23', '2026-10-26', '13:00:00');
     $job->handle();
-    \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\DefenseCountdownReminder::class, 1);
+    Mail::assertSent(DefenseCountdownReminder::class, 1);
     $r->update(['workflow_state' => 'cancelled']);
     $job->handle();
-    \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\DefenseCountdownReminder::class, 1);
+    Mail::assertSent(DefenseCountdownReminder::class, 1);
 });
 it('renders the countdown email with the latest request link', function () {
-    $html = (new \App\Mail\DefenseCountdownReminder('Demo', '3 days remaining before your defense'))->render();
+    $html = (new DefenseCountdownReminder('Demo', '3 days remaining before your defense'))->render();
     expect($html)->toContain('3 days remaining')->toContain('/defense-requirements');
 });

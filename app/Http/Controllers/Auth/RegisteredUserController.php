@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\Role;
-use App\Models\User; // FIX: import Role
+use App\Models\Adviser;
+use App\Models\Role; // FIX: import Role
+use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -60,7 +61,7 @@ class RegisteredUserController extends Controller
         Auth::login($user);
 
         // Update adviser status if matching adviser exists
-        $adviser = \App\Models\Adviser::where('email', $user->email)->first();
+        $adviser = Adviser::where('email', $user->email)->first();
         if ($adviser) {
             $adviser->status = 'active';
             $adviser->user_id = $user->id;

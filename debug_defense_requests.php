@@ -1,16 +1,20 @@
 <?php
 
+use App\Models\DefenseRequest;
+use App\Models\User;
+use Illuminate\Contracts\Console\Kernel;
+
 require_once 'vendor/autoload.php';
 
 $app = require_once 'bootstrap/app.php';
 
 // Bootstrap the application
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
 try {
     echo "=== Defense Requests Debug ===\n";
 
-    $defenseRequests = App\Models\DefenseRequest::all();
+    $defenseRequests = DefenseRequest::all();
     echo 'Total Defense Requests: '.$defenseRequests->count()."\n\n";
 
     if ($defenseRequests->count() > 0) {
@@ -27,7 +31,7 @@ try {
     }
 
     echo "\n=== Adviser Users ===\n";
-    $adviser = App\Models\User::where('role', 'Adviser')->get(['id', 'first_name', 'last_name', 'role']);
+    $adviser = User::where('role', 'Adviser')->get(['id', 'first_name', 'last_name', 'role']);
     echo 'Total Adviser: '.$adviser->count()."\n\n";
 
     foreach ($adviser as $user) {

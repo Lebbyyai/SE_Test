@@ -1,6 +1,9 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\UploadConfigServiceProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\UploadConfigServiceProvider::class,
+    AppServiceProvider::class,
+    UploadConfigServiceProvider::class,
 ];

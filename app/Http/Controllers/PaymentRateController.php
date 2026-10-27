@@ -7,6 +7,7 @@ use App\Services\PaymentRateCsv;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class PaymentRateController extends Controller
@@ -90,7 +91,7 @@ class PaymentRateController extends Controller
 
         foreach ($rates as $rate) {
             if (! in_array($rate->type, PaymentRateCsv::TYPES, true) || ! in_array($rate->defense_type, PaymentRateCsv::STAGES, true)) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['rates' => 'A saved rate has an unsupported label. Correct its type or defense stage before exporting.']);
+                throw ValidationException::withMessages(['rates' => 'A saved rate has an unsupported label. Correct its type or defense stage before exporting.']);
             }
         }
         $types = array_values(array_filter(PaymentRateCsv::TYPES, fn ($type) => $type !== 'Panel Member' || $rates->contains('type', $type)));

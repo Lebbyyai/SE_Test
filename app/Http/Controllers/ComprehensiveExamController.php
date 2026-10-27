@@ -5,8 +5,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\ExamApplication;
+use App\Services\ComprehensiveEligibilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ComprehensiveExamController extends Controller
@@ -96,9 +98,9 @@ class ComprehensiveExamController extends Controller
         if (ExamApplication::where('student_id', $studentId)->where('school_year', $validated['schoolYear'])->exists()) {
             return to_route('comprehensive-exam.index')->with('info', 'You already have an application for this school year.');
         }
-        $eligibility = app(\App\Services\ComprehensiveEligibilityService::class)->check($request);
+        $eligibility = app(ComprehensiveEligibilityService::class)->check($request);
         if (($eligibility['eligible'] ?? false) !== true) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['eligibility' => 'Eligibility has not been verified. Check your grades, documents, tuition clearance, and school portal session before applying.']);
+            throw ValidationException::withMessages(['eligibility' => 'Eligibility has not been verified. Check your grades, documents, tuition clearance, and school portal session before applying.']);
         }
 
         return DB::transaction(function () use ($studentId, $validated) {

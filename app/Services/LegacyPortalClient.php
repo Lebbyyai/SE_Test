@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use App\Models\DataAccessAudit;
+use App\Models\LegacyAcademicRecord;
+use App\Models\LegacyClearanceStatus;
+use App\Models\LegacyStudentInfo;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -30,7 +33,7 @@ class LegacyPortalClient
                 'timeout' => $config['timeout'],
             ])->get($base.'/index.cfm?fa=login.login_show');
             $baseCookies = $this->normalizeCookies($prefetch->cookies());
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $baseCookies = [];
         }
 
@@ -299,7 +302,7 @@ class LegacyPortalClient
             'student_id' => $studentId,
         ]);
         $url = $base.'/index.cfm?'.$query;
-        $resp = \Illuminate\Support\Facades\Http::withHeaders([
+        $resp = Http::withHeaders([
             'User-Agent' => $config['user_agent'],
             'Accept' => 'application/json, text/plain, */*',
             'Referer' => $base.'/index.cfm?fa=academic_record.view_student_academic_records',
@@ -370,7 +373,7 @@ class LegacyPortalClient
         if (is_object($cookies) && method_exists($cookies, 'toArray')) {
             try {
                 return $cookies->toArray();
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 return [];
             }
         }
@@ -410,7 +413,7 @@ class LegacyPortalClient
                 $pairs[] = $n.'='.$v;
             }
             $cookieHeader = implode('; ', $pairs);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::warning('mergeSetCookies failed: '.$e->getMessage());
         }
     }
@@ -600,7 +603,7 @@ class LegacyPortalClient
             if ($resp->ok()) {
                 return $resp->body();
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::debug('fetchEnrollmentStatisticsHtml error: '.$e->getMessage());
         }
 
@@ -650,7 +653,7 @@ class LegacyPortalClient
             if ($resp->ok()) {
                 return $resp->body();
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::debug('fetchInstructorClassListHtml error: '.$e->getMessage());
         }
 
@@ -756,7 +759,7 @@ class LegacyPortalClient
                     }
                 }
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::debug('parseInstructorClassList error: '.$e->getMessage());
         }
         $short = null;
@@ -814,7 +817,7 @@ class LegacyPortalClient
             if ($resp->ok()) {
                 return $resp->body();
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::debug('fetchStudentClassScheduleHtml error: '.$e->getMessage());
         }
 
@@ -845,7 +848,7 @@ class LegacyPortalClient
 
                 return true;
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::debug('setStudentClassSchedulePeriod error: '.$e->getMessage());
         }
 
@@ -906,7 +909,7 @@ class LegacyPortalClient
                 }
             }
             $instructors = array_values(array_unique($instructors));
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::debug('parseStudentClassSchedule error: '.$e->getMessage());
         }
 
@@ -968,7 +971,7 @@ class LegacyPortalClient
 
                 return $this->fetchInstructorClassListHtml($session);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::debug('setInstructorClassListPeriod error: '.$e->getMessage());
         }
 
@@ -1013,7 +1016,7 @@ class LegacyPortalClient
             if ($resp->ok()) {
                 return $resp->body();
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::debug('fetchEmployeeProfileHtml error: '.$e->getMessage());
         }
 
@@ -1380,7 +1383,7 @@ class LegacyPortalClient
     {
         try {
             if (isset($studentInfo['student_id']) && isset($studentInfo['degree_program_id'])) {
-                \App\Models\LegacyStudentInfo::updateOrCreate([
+                LegacyStudentInfo::updateOrCreate([
                     'user_id' => $user->id,
                 ], [
                     'student_id' => $studentInfo['student_id'],
@@ -1409,7 +1412,7 @@ class LegacyPortalClient
     {
         try {
             foreach ($records as $rec) {
-                \App\Models\LegacyAcademicRecord::updateOrCreate([
+                LegacyAcademicRecord::updateOrCreate([
                     'user_id' => $user->id,
                     'semester_id' => $semesterId,
                     'course_code' => $rec['code'] ?? $rec['course'] ?? null,
@@ -1483,7 +1486,7 @@ class LegacyPortalClient
                     }
                 }
 
-                \App\Models\LegacyClearanceStatus::updateOrCreate([
+                LegacyClearanceStatus::updateOrCreate([
                     'user_id' => $user->id,
                     'semester_id' => $semesterId,
                     'area' => $area['label'] ?? null,
@@ -1598,7 +1601,7 @@ class LegacyPortalClient
 
             return $data;
 
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Failed to fetch clearance by keyword', [
                 'keyword' => $keyword,
                 'error' => $e->getMessage(),

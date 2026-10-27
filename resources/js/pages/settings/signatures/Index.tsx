@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { csrfHeaders } from '@/lib/csrf';
 import { Head } from '@inertiajs/react';
 import { Signature, Trash2, UploadCloud } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -38,7 +39,7 @@ export default function SignaturesIndex() {
         setUploading(true);
         const fd = new FormData();
         fd.append('image', e.target.files[0]);
-        const res = await fetch('/api/signatures', { method: 'POST', body: fd });
+        const res = await fetch('/api/signatures', { method: 'POST', body: fd, headers: csrfHeaders() });
         setUploading(false);
         if (res.ok) {
             toast.success('Signature uploaded!');
@@ -55,15 +56,11 @@ export default function SignaturesIndex() {
         const natural_width = canvas.width;
         const natural_height = canvas.height;
         const label = 'Drawn Signature';
-        const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
 
         setUploading(true);
         const res = await fetch('/api/signatures', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken || '',
-            },
+            headers: csrfHeaders(true),
             body: JSON.stringify({
                 image_base64: dataUrl,
                 label,
@@ -85,7 +82,7 @@ export default function SignaturesIndex() {
 
     async function activate(id: number) {
         setLoading(true);
-        const res = await fetch(`/api/signatures/${id}/activate`, { method: 'PATCH' });
+        const res = await fetch(`/api/signatures/${id}/activate`, { method: 'PATCH', headers: csrfHeaders() });
         setLoading(false);
         if (res.ok) {
             toast.success('Signature activated!');

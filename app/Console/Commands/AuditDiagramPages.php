@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Http\Kernel;
@@ -39,7 +40,7 @@ class AuditDiagramPages extends Command
                 app('auth')->forgetGuards();
                 Auth::guard('web')->setUser($user);
                 $request = Request::create($url, 'GET', server: ['HTTP_ACCEPT' => 'application/json', 'HTTP_X_INERTIA' => 'true']);
-                $request->headers->set('X-Inertia-Version', app(\App\Http\Middleware\HandleInertiaRequests::class)->version($request) ?? '');
+                $request->headers->set('X-Inertia-Version', app(HandleInertiaRequests::class)->version($request) ?? '');
                 $request->setUserResolver(fn () => $user);
                 $response = $kernel->handle($request);
                 $body = json_decode($response->getContent(), true);

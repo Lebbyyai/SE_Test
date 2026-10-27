@@ -6,6 +6,7 @@ use App\Mail\DefenseCountdownReminder;
 use App\Models\DefenseRequest;
 use App\Models\Notification;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -46,7 +47,7 @@ class SendDefenseCountdownEmail implements ShouldBeUnique, ShouldQueue
         if (! in_array($dr->workflow_state, ['scheduled', 'coordinator-approved', 'panels-assigned'], true) || in_array($dr->status, ['Cancelled', 'Completed', 'Rejected'], true)) {
             return;
         }
-        if (\Carbon\CarbonImmutable::parse($this->scheduledDate.' '.($this->scheduledTime ?: '23:59:59'), 'Asia/Manila') <= \Carbon\CarbonImmutable::now('Asia/Manila')) {
+        if (CarbonImmutable::parse($this->scheduledDate.' '.($this->scheduledTime ?: '23:59:59'), 'Asia/Manila') <= CarbonImmutable::now('Asia/Manila')) {
             return;
         }
         Mail::to($student->email)->send(new DefenseCountdownReminder($student->first_name, $notice->message));

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\SendDefenseCountdownEmail;
 use App\Models\DefenseRequest;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -47,7 +48,7 @@ class DefenseReminderService
                 if ($notification->wasRecentlyCreated) {
                     $sent++;
                     if (config('defense-notifications.email_enabled') && $request->user->email) {
-                        \App\Jobs\SendDefenseCountdownEmail::dispatch($notification->id, $today->toDateString(), $date->toDateString(), $request->scheduled_time)->afterCommit();
+                        SendDefenseCountdownEmail::dispatch($notification->id, $today->toDateString(), $date->toDateString(), $request->scheduled_time)->afterCommit();
                     }
                 }
             }

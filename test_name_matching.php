@@ -2,9 +2,10 @@
 
 require_once __DIR__.'/vendor/autoload.php';
 $app = require_once __DIR__.'/bootstrap/app.php';
-$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
 use App\Models\User;
+use Illuminate\Contracts\Console\Kernel;
 
 echo "=== TESTING FLEXIBLE NAME MATCHING ===\n\n";
 

@@ -2,7 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\DefenseRequest;
 use App\Models\Notification;
+use App\Observers\DefenseRequestObserver;
+use App\Services\DefenseReminderService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 use Inertia\Inertia;
@@ -22,11 +25,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        \App\Models\DefenseRequest::observe(\App\Observers\DefenseRequestObserver::class);
+        DefenseRequest::observe(DefenseRequestObserver::class);
         Inertia::share([
             'notifications' => function () {
                 if (Auth::check()) {
-                    app(\App\Services\DefenseReminderService::class)->send(Auth::user());
+                    app(DefenseReminderService::class)->send(Auth::user());
 
                     return Notification::where('user_id', Auth::id())
                         ->latest()->take(20)->get();

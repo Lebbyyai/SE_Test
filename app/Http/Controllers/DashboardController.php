@@ -2,8 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Adviser;
+use App\Models\CoordinatorProgramAssignment;
+use App\Models\DefenseRequest;
+use App\Models\DefenseRequirement;
+use App\Models\ExamApplication;
+use App\Models\HonorariumDisbursement;
+use App\Models\Panelist;
+use App\Models\PaymentSubmission;
 use App\Models\User;
 use App\Services\CoordinatorProgramService;
+use App\Services\StudentProfileEnricher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -52,7 +61,7 @@ class DashboardController extends Controller
                     // Dispatch enrichment to background
                     dispatch(function () use ($user, $legacySession, $enrichmentData) {
                         try {
-                            $enricher = app(\App\Services\StudentProfileEnricher::class);
+                            $enricher = app(StudentProfileEnricher::class);
 
                             Log::info('Background Job: Starting profile enrichment', [
                                 'user_id' => $user->id,
@@ -66,7 +75,7 @@ class DashboardController extends Controller
                                 $uicEmail = $user->generateUicEmail();
 
                                 if ($uicEmail !== $user->email) {
-                                    $existingUser = \App\Models\User::where('email', $uicEmail)
+                                    $existingUser = User::where('email', $uicEmail)
                                         ->where('id', '!=', $user->id)
                                         ->first();
 
@@ -142,15 +151,15 @@ class DashboardController extends Controller
 
         try {
             // latest defense requirement for the student (if your model uses user_id)
-            if (class_exists(\App\Models\DefenseRequirement::class)) {
-                $latestRequirement = \App\Models\DefenseRequirement::where('user_id', $user->id)
+            if (class_exists(DefenseRequirement::class)) {
+                $latestRequirement = DefenseRequirement::where('user_id', $user->id)
                     ->orderByDesc('created_at')
                     ->first();
             }
 
             // get all defense requests that match the student's identity (school_id + name)
-            if (class_exists(\App\Models\DefenseRequest::class)) {
-                $defenseRequests = \App\Models\DefenseRequest::where('school_id', $user->school_id)
+            if (class_exists(DefenseRequest::class)) {
+                $defenseRequests = DefenseRequest::where('school_id', $user->school_id)
                     ->where('first_name', $user->first_name)
                     ->where('last_name', $user->last_name)
                     ->orderByDesc('date_of_defense')
@@ -158,8 +167,8 @@ class DashboardController extends Controller
             }
 
             // find a related defense request using thesis_title from the latest requirement (if present)
-            if ($latestRequirement && class_exists(\App\Models\DefenseRequest::class)) {
-                $defenseRequest = \App\Models\DefenseRequest::where('thesis_title', $latestRequirement->thesis_title)
+            if ($latestRequirement && class_exists(DefenseRequest::class)) {
+                $defenseRequest = DefenseRequest::where('thesis_title', $latestRequirement->thesis_title)
                     ->where('school_id', $user->school_id)
                     ->where('first_name', $user->first_name)
                     ->where('last_name', $user->last_name)
@@ -169,7 +178,7 @@ class DashboardController extends Controller
 
             if (in_array($roleName, ['Coordinator', 'Administrative Assistant', 'Dean'])) {
                 // Send ALL defense requests for coordinator
-                $defenseRequests = \App\Models\DefenseRequest::orderByDesc('created_at')->get();
+                $defenseRequests = DefenseRequest::orderByDesc('created_at')->get();
             }
         } catch (\Throwable $e) {
             // don't crash the dashboard for missing models/columns — log if you want
@@ -206,6 +215,32 @@ class DashboardController extends Controller
             'studentsCount' => $studentsCount,
         ];
 
+        if (in_array($effective, ['Coordinator', 'Administrative Assistant'], true)) {
+            $honorariums = HonorariumDisbursement::whereIn('status', ['prepared', 'approved']);
+            if ($effective === 'Coordinator') {
+                $honorariums->whereHas('defenseRequest', fn ($q) => $q->where('coordinator_user_id', $user->id));
+            }
+            $props['stats'] = ['pending_honorariums' => $honorariums->count()];
+            if ($effective === 'Administrative Assistant') {
+                $props['stats'] += [
+                    'todays_defenses' => DefenseRequest::whereDate('scheduled_date', today())
+                        ->whereIn('workflow_state', ['scheduled', 'completed'])->count(),
+                    'pending_applications' => ExamApplication::where('final_approval_status', 'pending')->count(),
+                    'pending_payments' => PaymentSubmission::where('status', 'pending')->count(),
+                    'pending_defense_requests' => DefenseRequest::where('coordinator_status', 'Approved')
+                        ->whereNotIn('workflow_state', ['completed', 'cancelled'])->count(),
+                    'upcoming_deadlines' => 0,
+                ];
+            }
+        }
+        if ($effective === 'Student') {
+            $examPayment = PaymentSubmission::where('student_id', $user->id)->latest('payment_id')->first();
+            $defensePayment = DefenseRequest::where('submitted_by', $user->id)
+                ->whereNotNull('proof_of_payment')->latest()->first();
+            $examIsLatest = $examPayment && (! $defensePayment || $examPayment->created_at >= $defensePayment->created_at);
+            $props['recentPayment'] = ['amount' => (float) ($examIsLatest ? $examPayment->amount_paid : ($defensePayment?->amount ?? 0))];
+        }
+
         if ($effective === 'Dean') {
             $props['graduateStaff'] = $this->getGraduateStaff();
         }
@@ -216,7 +251,7 @@ class DashboardController extends Controller
             $props['coordinatorPrograms'] = CoordinatorProgramService::getProgramsByEmail($user->email);
 
             // Add this to include all panelists
-            $props['panelists'] = \App\Models\Panelist::all(['id', 'name', 'email']);
+            $props['panelists'] = Panelist::all(['id', 'name', 'email']);
         }
 
         // --- Super Admin specific data ---
@@ -236,9 +271,9 @@ class DashboardController extends Controller
         $staff = User::whereIn('role', ['Coordinator', 'Administrative Assistant'])
             ->with('coordinatorPrograms')->orderBy('last_name')->orderBy('first_name')->get();
         $ids = $staff->pluck('id');
-        $assignments = \App\Models\CoordinatorProgramAssignment::whereIn('coordinator_user_id', $ids)
+        $assignments = CoordinatorProgramAssignment::whereIn('coordinator_user_id', $ids)
             ->where('is_active', true)->get()->groupBy('coordinator_user_id');
-        $advisers = \App\Models\Adviser::whereIn('coordinator_id', $ids)->get()->groupBy('coordinator_id');
+        $advisers = Adviser::whereIn('coordinator_id', $ids)->get()->groupBy('coordinator_id');
         $students = DB::table('adviser_student')->whereIn('requested_by', $ids)->where('status', 'accepted')
             ->select('requested_by', DB::raw('count(distinct student_id) as total'))->groupBy('requested_by')->pluck('total', 'requested_by');
 
@@ -453,8 +488,8 @@ class DashboardController extends Controller
             $pendingRequests = 0;
 
             // Try to get pending defense requests if the model exists
-            if (class_exists(\App\Models\DefenseRequest::class)) {
-                $pendingRequests = \App\Models\DefenseRequest::whereIn('workflow_state', ['submitted', 'pending', 'adviser-pending'])->count();
+            if (class_exists(DefenseRequest::class)) {
+                $pendingRequests = DefenseRequest::whereIn('workflow_state', ['submitted', 'pending', 'adviser-pending'])->count();
             }
 
             return [
@@ -517,7 +552,7 @@ class DashboardController extends Controller
             $mappings = CoordinatorProgramService::getAllMappings();
 
             // Get defense requests with coordinator assignments
-            $requests = \App\Models\DefenseRequest::with(['coordinatorUser', 'user'])
+            $requests = DefenseRequest::with(['coordinatorUser', 'user'])
                 ->whereNotNull('coordinator_user_id')
                 ->select([
                     'id', 'coordinator_user_id', 'program', 'thesis_title',

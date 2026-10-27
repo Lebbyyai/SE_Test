@@ -3,8 +3,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { csrfHeaders } from '@/lib/csrf';
 import { Head } from '@inertiajs/react';
 import React, { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 type BreadcrumbItem = { title: string; href: string };
 type Template = { id: number; name: string; code: string; version: number };
@@ -26,16 +28,14 @@ export default function DocumentTemplatesIndex() {
 
     async function load() {
         const r = await fetch('/api/document-templates', {
-            headers: {
-                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
-            },
+            headers: csrfHeaders(),
             credentials: 'include',
         });
         if (r.ok) setList(await r.json());
     }
 
     useEffect(() => {
-        fetch('/sanctum/csrf-cookie').then(load);
+        load();
     }, []);
 
     async function submit(e: React.FormEvent) {
@@ -48,9 +48,7 @@ export default function DocumentTemplatesIndex() {
         const r = await fetch('/api/document-templates', {
             method: 'POST',
             body: fd,
-            headers: {
-                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
-            },
+            headers: csrfHeaders(),
             credentials: 'include',
         });
         setBusy(false);
@@ -59,6 +57,10 @@ export default function DocumentTemplatesIndex() {
             setFile(null);
             if (fileInput.current) fileInput.current.value = '';
             load();
+            toast.success('Template uploaded.');
+        } else {
+            const data = await r.json().catch(() => null);
+            toast.error(data?.message ?? 'Unable to upload template. Please try again.');
         }
     }
 

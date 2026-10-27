@@ -2,19 +2,26 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\ProgramLevel;
 use App\Mail\DefenseRequestApproved;
 use App\Mail\DefenseRequestAssignedToCoordinator;
 use App\Mail\DefenseRequestRejected;
 use App\Mail\DefenseRequestSubmitted;
+use App\Models\AaPaymentVerification;
 use App\Models\DefenseRequest;
+use App\Models\HonorariumDisbursement;
 use App\Models\Notification;
+use App\Models\Panelist;
+use App\Models\PaymentRate;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class DefenseRequestController extends Controller
@@ -83,7 +90,7 @@ class DefenseRequestController extends Controller
                         ->map(function ($panelistIdOrName) {
                             // Try to resolve by ID first
                             if (is_numeric($panelistIdOrName)) {
-                                $p = \App\Models\Panelist::find($panelistIdOrName);
+                                $p = Panelist::find($panelistIdOrName);
                                 if ($p) {
                                     return ['id' => $p->id, 'name' => $p->name];
                                 }
@@ -607,9 +614,9 @@ class DefenseRequestController extends Controller
 
             // --- NEW: Auto-create payment verification record if approved ---
             if ($defenseRequest->coordinator_status === 'Approved') {
-                $existing = \App\Models\AaPaymentVerification::where('defense_request_id', $defenseRequest->id)->first();
+                $existing = AaPaymentVerification::where('defense_request_id', $defenseRequest->id)->first();
                 if (! $existing) {
-                    \App\Models\AaPaymentVerification::create([
+                    AaPaymentVerification::create([
                         'defense_request_id' => $defenseRequest->id,
                         'assigned_to' => null, // or set to an AA user id if you want
                         'status' => 'pending',
@@ -639,6 +646,7 @@ class DefenseRequestController extends Controller
     /** Lightweight API for polling */
     public function apiShow(DefenseRequest $defenseRequest)
     {
+        $this->assertCanRead($defenseRequest);
         $user = Auth::user();
         if (! $user) {
             abort(401);
@@ -1130,7 +1138,7 @@ class DefenseRequestController extends Controller
         ];
 
         $count = 0;
-        foreach (\App\Models\DefenseRequest::all() as $dr) {
+        foreach (DefenseRequest::all() as $dr) {
             foreach ($fields as $field) {
                 if (! empty($dr->$field)) {
                     $count++;
@@ -1160,7 +1168,7 @@ class DefenseRequestController extends Controller
 
         $updated = [];
         foreach ($data['ids'] as $id) {
-            $defenseRequest = DefenseRequest::find($id);
+            $defenseRequest = DefenseRequest::where('adviser_user_id', $user->id)->find($id);
             if (! $defenseRequest) {
                 continue;
             }
@@ -1216,7 +1224,7 @@ class DefenseRequestController extends Controller
 
         $updated = [];
         foreach ($data['ids'] as $id) {
-            $defenseRequest = DefenseRequest::find($id);
+            $defenseRequest = DefenseRequest::where('adviser_user_id', $user->id)->find($id);
             if (! $defenseRequest) {
                 continue;
             }
@@ -1259,7 +1267,7 @@ class DefenseRequestController extends Controller
 
         $updated = [];
         foreach ($data['ids'] as $id) {
-            $defenseRequest = DefenseRequest::find($id);
+            $defenseRequest = DefenseRequest::where('adviser_user_id', $user->id)->find($id);
             if (! $defenseRequest) {
                 continue;
             }
@@ -1284,6 +1292,12 @@ class DefenseRequestController extends Controller
 
     public function uploadDocuments(Request $request, DefenseRequest $defenseRequest)
     {
+        abort_unless($request->user()?->role === 'Adviser'
+            && (int) $defenseRequest->adviser_user_id === (int) $request->user()->id, 403);
+        $request->validate([
+            'ai_detection_certificate' => 'nullable|file|mimes:pdf,doc,docx|max:20480',
+            'endorsement_form' => 'nullable|file|mimes:pdf,doc,docx|max:20480',
+        ]);
         $data = [];
         if ($request->hasFile('ai_detection_certificate')) {
             $file = $request->file('ai_detection_certificate');
@@ -1432,10 +1446,10 @@ class DefenseRequestController extends Controller
             ])
             ->map(function ($r) {
                 // Get program level
-                $programLevel = \App\Helpers\ProgramLevel::getLevel($r->program);
+                $programLevel = ProgramLevel::getLevel($r->program);
 
                 // Sum all rates for this program level and defense type
-                $expectedTotal = \App\Models\PaymentRate::where('program_level', $programLevel)
+                $expectedTotal = PaymentRate::where('program_level', $programLevel)
                     ->where('defense_type', $r->defense_type)
                     ->whereNotIn('type', ['External Panel Chair', 'External Panel Member'])
                     ->sum('amount');
@@ -1443,7 +1457,7 @@ class DefenseRequestController extends Controller
                 // Get coordinator name
                 $coordinator = null;
                 if ($r->coordinator_user_id) {
-                    $coordUser = \App\Models\User::find($r->coordinator_user_id);
+                    $coordUser = User::find($r->coordinator_user_id);
                     if ($coordUser) {
                         $coordinator = trim($coordUser->first_name.' '.($coordUser->middle_name ? strtoupper($coordUser->middle_name[0]).'. ' : '').$coordUser->last_name);
                     }
@@ -1467,7 +1481,7 @@ class DefenseRequestController extends Controller
                     'defense_mode' => $r->defense_mode,
                     'mode_defense' => $r->defense_mode,
                     'adviser' => $r->defense_adviser ?? '—',
-                    'submitted_at' => $r->submitted_at ? \Carbon\Carbon::parse($r->submitted_at)->format('Y-m-d H:i:s') : null,
+                    'submitted_at' => $r->submitted_at ? Carbon::parse($r->submitted_at)->format('Y-m-d H:i:s') : null,
                     'coordinator_status' => $r->coordinator_status,
                     // --- ADD THESE FIELDS ---
                     'expected_rate' => $expectedTotal,
@@ -1492,13 +1506,13 @@ class DefenseRequestController extends Controller
             abort(403);
         }
 
-        $defenseRequest = \App\Models\DefenseRequest::findOrFail($id);
+        $defenseRequest = DefenseRequest::findOrFail($id);
 
         // Use the helper to get the program level
-        $programLevel = \App\Helpers\ProgramLevel::getLevel($defenseRequest->program);
+        $programLevel = ProgramLevel::getLevel($defenseRequest->program);
 
         // Fetch the expected rate for this program level and defense type
-        $expectedRate = \App\Models\PaymentRate::where('program_level', $programLevel)
+        $expectedRate = PaymentRate::where('program_level', $programLevel)
             ->where('defense_type', $defenseRequest->defense_type)
             ->where('type', 'School Share') // or your desired type
             ->first();
@@ -1515,7 +1529,7 @@ class DefenseRequestController extends Controller
             ->filter()
             ->map(function ($panelistIdOrName) {
                 if (is_numeric($panelistIdOrName)) {
-                    $p = \App\Models\Panelist::find($panelistIdOrName);
+                    $p = Panelist::find($panelistIdOrName);
                     if ($p) {
                         return ['id' => $p->id, 'name' => $p->name];
                     }
@@ -1524,7 +1538,7 @@ class DefenseRequestController extends Controller
                 return ['id' => null, 'name' => $panelistIdOrName];
             })->values()->all();
 
-        return \Inertia\Inertia::render('assistant/all-defense-list/details', [
+        return Inertia::render('assistant/all-defense-list/details', [
             'defenseRequest' => [
                 'id' => $defenseRequest->id,
                 'first_name' => $defenseRequest->first_name,
@@ -1576,5 +1590,92 @@ class DefenseRequestController extends Controller
                 'coordinator_status' => $defenseRequest->coordinator_status ?? null,
             ],
         ]);
+    }
+
+    private function assertCanRead(DefenseRequest $defenseRequest): void
+    {
+        $user = Auth::user();
+        abort_unless($user, 401);
+        $allowed = match ($user->role) {
+            'Student' => (int) $defenseRequest->submitted_by === (int) $user->id,
+            'Adviser' => (int) $defenseRequest->adviser_user_id === (int) $user->id,
+            'Coordinator' => (int) $defenseRequest->coordinator_user_id === (int) $user->id,
+            'Administrative Assistant', 'Dean', 'Super Admin' => true,
+            default => false,
+        };
+        abort_unless($allowed, 403);
+    }
+
+    public function show(DefenseRequest $defenseRequest)
+    {
+        return $this->apiShow($defenseRequest);
+    }
+
+    public function adviserCandidates(Request $request)
+    {
+        abort_unless($request->user()->role === 'Student', 403);
+        $names = $request->user()->advisers()->wherePivot('status', 'accepted')->get()
+            ->map(fn ($user) => trim($user->first_name.' '.$user->last_name))->values();
+
+        return response()->json(['instructors' => $names]);
+    }
+
+    public function adviserSuggestion(Request $request)
+    {
+        $candidates = $this->adviserCandidates($request)->getData(true)['instructors'];
+
+        return response()->json(['suggestion' => $candidates[0] ?? null, 'source' => 'accepted-assignment']);
+    }
+
+    public function pending(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(in_array($user->role, ['Coordinator', 'Adviser', 'Administrative Assistant', 'Dean', 'Super Admin'], true), 403);
+        $query = DefenseRequest::where('status', 'Pending');
+        if ($user->role === 'Coordinator') {
+            $query->where('coordinator_user_id', $user->id);
+        }
+        if ($user->role === 'Adviser') {
+            $query->where('adviser_user_id', $user->id);
+        }
+
+        return response()->json($query->latest()->get());
+    }
+
+    public function bulkDelete(Request $request)
+    {
+        abort_unless(in_array($request->user()->role, ['Coordinator', 'Administrative Assistant', 'Dean', 'Super Admin'], true), 403);
+        $data = $request->validate(['ids' => 'required|array|min:1', 'ids.*' => 'required|integer|distinct|exists:defense_requests,id']);
+
+        return DB::transaction(function () use ($data) {
+            $rows = DefenseRequest::whereIn('id', $data['ids'])->lockForUpdate()->get();
+            foreach ($rows as $row) {
+                $this->assertCanRead($row);
+                abort_unless(in_array($row->status, ['Cancelled', 'Rejected'], true), 422, 'Only cancelled or rejected requests can be removed.');
+                abort_if($row->honorariumPayments()->exists() || HonorariumDisbursement::where('defense_request_id', $row->id)->exists(), 422, 'Requests with financial records must be retained.');
+            }
+            foreach ($rows as $row) {
+                $row->delete();
+            }
+
+            return response()->json(['ok' => true, 'deleted_count' => $rows->count()]);
+        });
+    }
+
+    public function downloadAttachment(string $filename)
+    {
+        abort_if(basename($filename) !== $filename, 404);
+        $path = 'defense-attachments/'.$filename;
+        $query = DefenseRequest::query()->where(function ($q) use ($path) {
+            foreach (['manuscript_proposal', 'similarity_index', 'avisee_adviser_attachment', 'proof_of_payment', 'rec_endorsement'] as $field) {
+                $q->orWhere($field, $path);
+            }
+        });
+        $row = $query->firstOrFail();
+        $this->assertCanRead($row);
+        $disk = Storage::disk('local');
+        abort_unless($disk->exists($path), 404);
+
+        return $disk->download($path);
     }
 }

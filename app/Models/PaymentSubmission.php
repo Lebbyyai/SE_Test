@@ -32,11 +32,11 @@ class PaymentSubmission extends Model
     public function student(): BelongsTo
     {
         // Change to Student::class if you use a dedicated students table
-        return $this->belongsTo(\App\Models\User::class, 'student_id');
+        return $this->belongsTo(User::class, 'student_id');
     }
 
     public function checker(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'checked_by');
+        return $this->belongsTo(User::class, 'checked_by');
     }
 }

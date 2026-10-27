@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\DefensePanelInvitation;
 use App\Mail\DefenseScheduled;
+use App\Mail\DefenseScheduledAdviser;
+use App\Mail\DefenseScheduledStudent;
 use App\Models\DefenseRequest;
 use App\Models\Notification;
 use App\Models\Panelist;
 use App\Models\User;
 use App\Services\DefenseNotificationService;
+use App\Services\DefenseSchedulingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -409,7 +413,7 @@ class CoordinatorDefenseController extends Controller
         $student = $defenseRequest->user;
         try {
             if ($student && $student->email) {
-                Mail::to($student->email)->send(new \App\Mail\DefenseScheduledStudent($defenseRequest));
+                Mail::to($student->email)->send(new DefenseScheduledStudent($defenseRequest));
                 $emailsSent[] = "Student: {$student->email}";
                 Log::info('Defense notification sent to student', [
                     'defense_request_id' => $defenseRequest->id,
@@ -429,7 +433,7 @@ class CoordinatorDefenseController extends Controller
         $adviser = $defenseRequest->adviserUser;
         try {
             if ($adviser && $adviser->email) {
-                Mail::to($adviser->email)->send(new \App\Mail\DefenseScheduledAdviser($defenseRequest));
+                Mail::to($adviser->email)->send(new DefenseScheduledAdviser($defenseRequest));
                 $emailsSent[] = "Adviser: {$adviser->email}";
                 Log::info('Defense notification sent to adviser', [
                     'defense_request_id' => $defenseRequest->id,
@@ -451,7 +455,7 @@ class CoordinatorDefenseController extends Controller
             try {
                 if ($panel->email) {
                     $role = isset($panel->pivot->role) ? $panel->pivot->role : 'Panel Member';
-                    Mail::to($panel->email)->send(new \App\Mail\DefensePanelInvitation(
+                    Mail::to($panel->email)->send(new DefensePanelInvitation(
                         $defenseRequest,
                         $panel,
                         $role
@@ -657,7 +661,7 @@ class CoordinatorDefenseController extends Controller
         if (in_array($defenseRequest->workflow_state, ['adviser-corrections', 'coordinator-corrections'], true)) {
             return response()->json(['error' => 'Wait for the student to resubmit corrections before continuing this request.'], 422);
         }
-        $service = app(\App\Services\DefenseSchedulingService::class);
+        $service = app(DefenseSchedulingService::class);
         $service->authorize($defenseRequest, $request->user());
         $data = $request->validate(['defense_chairperson' => 'required|string|max:255', 'defense_panelist1' => 'required|string|max:255', 'defense_panelist2' => 'nullable|string|max:255', 'defense_panelist3' => 'nullable|string|max:255', 'defense_panelist4' => 'nullable|string|max:255']);
         $updated = $service->persist($defenseRequest, $data, $request->user(), false);
@@ -670,7 +674,7 @@ class CoordinatorDefenseController extends Controller
         if (in_array($defenseRequest->workflow_state, ['adviser-corrections', 'coordinator-corrections'], true)) {
             return response()->json(['error' => 'Wait for the student to resubmit corrections before continuing this request.'], 422);
         }
-        $service = app(\App\Services\DefenseSchedulingService::class);
+        $service = app(DefenseSchedulingService::class);
         $service->authorize($defenseRequest, $request->user());
         $data = $request->validate(['scheduled_date' => 'required|date_format:Y-m-d', 'scheduled_time' => 'required|date_format:H:i', 'scheduled_end_time' => 'required|date_format:H:i|after:scheduled_time', 'defense_mode' => 'required|in:face-to-face,online', 'defense_venue' => 'required|string|max:255', 'scheduling_notes' => 'nullable|string|max:1000']);
         $updated = $service->persist($defenseRequest, $data, $request->user(), true);

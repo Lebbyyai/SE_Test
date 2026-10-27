@@ -6,6 +6,7 @@ use App\Models\DefenseRequest;
 use App\Models\Panelist;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Validation\ValidationException;
 
 class DefenseConflictService
 {
@@ -103,7 +104,7 @@ class DefenseConflictService
     {
         $errors = $this->validateAssignmentBasic($dr, $dr->getAttributes());
         if ($errors) {
-            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+            throw ValidationException::withMessages($errors);
         }
         if (! $dr->scheduled_date || ! $dr->scheduled_time) {
             return;
@@ -111,16 +112,16 @@ class DefenseConflictService
         $date = $dr->scheduled_date->format('Y-m-d');
         $end = $dr->scheduled_end_time ?: CarbonImmutable::parse($dr->scheduled_time)->addHour()->format('H:i:s');
         if ($end <= $dr->scheduled_time) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['scheduled_end_time' => 'End time must be after start time.']);
+            throw ValidationException::withMessages(['scheduled_end_time' => 'End time must be after start time.']);
         }
         if ($this->findPanelSchedulingConflicts($dr, [], $date, $dr->scheduled_time, $end)) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['scheduled_time' => 'A selected panelist or adviser has an overlapping defense.']);
+            throw ValidationException::withMessages(['scheduled_time' => 'A selected panelist or adviser has an overlapping defense.']);
         }
         if ($this->hasVenueConflict($dr, $dr->defense_venue, $date, $dr->scheduled_time, $end)) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['defense_venue' => 'The venue is already booked during this time.']);
+            throw ValidationException::withMessages(['defense_venue' => 'The venue is already booked during this time.']);
         }
         if ($dr->submitted_by && $this->overlapping($dr, $date, $dr->scheduled_time, $end)->contains(fn ($r) => (int) $r->submitted_by === (int) $dr->submitted_by)) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['scheduled_time' => 'This student already has a defense during this time.']);
+            throw ValidationException::withMessages(['scheduled_time' => 'This student already has a defense during this time.']);
         }
     }
 }

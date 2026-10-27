@@ -212,13 +212,13 @@ class DefenseRequirementController extends Controller
             'thesis_title' => 'required|string',
             'adviser' => 'required|string',
             'adviser_id' => 'nullable|integer|exists:users,id',
-            'defense_type' => 'required|string',
-            'rec_endorsement' => "nullable|file|mimes:{$allowedMimes}|max:{$maxFileSize}",
-            'proof_of_payment' => "nullable|file|mimes:{$allowedMimes}|max:{$maxFileSize}",
-            'reference_no' => 'nullable|string|max:150',
-            'manuscript_proposal' => "nullable|file|mimes:pdf,doc,docx|max:{$maxFileSize}",
-            'similarity_index' => "nullable|file|mimes:{$allowedMimes}|max:{$maxFileSize}",
-            'avisee_adviser_attachment' => "nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:{$maxFileSize}",
+            'defense_type' => 'required|in:Proposal,Prefinal,Final',
+            'rec_endorsement' => "required_if:defense_type,Prefinal,Final|nullable|file|mimes:{$allowedMimes}|max:{$maxFileSize}",
+            'proof_of_payment' => "required|file|mimes:{$allowedMimes}|max:{$maxFileSize}",
+            'reference_no' => 'required|string|max:150',
+            'manuscript_proposal' => "required|file|mimes:pdf,doc,docx|max:{$maxFileSize}",
+            'similarity_index' => "required|file|mimes:{$allowedMimes}|max:{$maxFileSize}",
+            'avisee_adviser_attachment' => "required_if:defense_type,Proposal|nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:{$maxFileSize}",
             'amount' => 'required|numeric|min:0', // <-- Add this line
         ]);
 
@@ -270,7 +270,7 @@ class DefenseRequirementController extends Controller
             // If adviser_id is not present, fallback to name mapping
             if (! $defenseRequestData['adviser_user_id'] && $defenseRequestData['defense_adviser']) {
                 $normalized = preg_replace('/\s+/', ' ', strtolower($defenseRequestData['defense_adviser']));
-                $match = \App\Models\User::whereIn('role', ['Adviser'])
+                $match = User::whereIn('role', ['Adviser'])
                     ->get()
                     ->first(function ($u) use ($normalized) {
                         $combo1 = strtolower($u->first_name.' '.$u->last_name);

@@ -37,8 +37,9 @@ function isDaytime() {
 export default function CoordinatorDashboard() {
     const {
         auth: { user },
+        stats,
         panelists, // <-- Add this line to get panelists from Inertia props if available
-    } = usePage<PageProps & { panelists?: unknown[] }>().props;
+    } = usePage<PageProps & { panelists?: unknown[]; stats?: { pending_honorariums: number } }>().props;
 
     const [todayEventCount, setTodayEventCount] = useState<number | null>(null);
     const [pendingRequests, setPendingRequests] = useState<DefenseOverview[]>([]);
@@ -145,7 +146,7 @@ export default function CoordinatorDashboard() {
         },
         {
             title: 'Pending Honorariums',
-            value: 7, // Replace with real value if available
+            value: stats?.pending_honorariums ?? 'Unavailable',
             description: 'Honorariums not yet processed',
             icon: <BadgeDollarSign className="size-5 text-amber-500" />,
             iconTheme: 'bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-300',

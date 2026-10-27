@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DefenseRegisterController;
 use App\Models\DefenseRequest;
 use App\Models\DefenseServiceRecord;
 use App\Models\FinanceDocumentSubmission;
@@ -8,15 +9,19 @@ use App\Models\Panelist;
 use App\Models\PaymentRate;
 use App\Models\User;
 use App\Services\DefenseRegisterExport;
+use App\Services\DefenseServiceConfirmation;
 use App\Services\HonorariumAccess;
 use App\Services\HonorariumLedgerService;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
     $this->withoutVite();
-    $this->travelTo(\Carbon\Carbon::parse('2026-10-26 14:00:00', 'Asia/Manila'));
+    $this->travelTo(Carbon::parse('2026-10-26 14:00:00', 'Asia/Manila'));
     Http::preventStrayRequests();
     Mail::fake();
 });
@@ -189,7 +194,7 @@ test('classification edits invalidate Finance verification and current service e
     $this->postJson('/defense-register/'.$defense->id.'/confirm-service', $payload)->assertOk();
     $this->patchJson('/defense-register/'.$defense->id.'/panel-types', ['notes' => 'Correct external membership', 'participants' => array_values(array_filter(registerPayload($defense, 'external')['participants'], fn ($p) => str_starts_with($p['recipient_key'], 'panel:')))])->assertOk();
     expect(FinanceDocumentSubmission::where('document_type', 'panel_breakdown')->first()->status)->toBe('rejected');
-    expect(app(\App\Services\DefenseServiceConfirmation::class)->current($defense->fresh()))->toBeNull();
+    expect(app(DefenseServiceConfirmation::class)->current($defense->fresh()))->toBeNull();
 });
 
 test('exports preserve parallel sessions and store user text literally without formulas', function () {
@@ -198,9 +203,9 @@ test('exports preserve parallel sessions and store user text literally without f
     $parallel->thesis_title = 'Parallel session';
     $parallel->saveQuietly();
     $this->actingAs($users['coordinator']);
-    $request = \Illuminate\Http\Request::create('/defense-register');
+    $request = Request::create('/defense-register');
     $request->setUserResolver(fn () => $users['coordinator']);
-    $data = app(\App\Http\Controllers\DefenseRegisterController::class)->data($request);
+    $data = app(DefenseRegisterController::class)->data($request);
     $path = app(DefenseRegisterExport::class)->xlsx($data);
     try {
         $zip = new ZipArchive;
@@ -243,7 +248,7 @@ test('legacy duplicate panel names cannot silently identify a financial recipien
     [$defense] = registerFixture();
     Panelist::create(['name' => 'Test Chair', 'email' => 'other-chair@example.test', 'role' => 'Chairperson', 'status' => 'Assigned']);
     $defense->defense_chairperson = 'Test Chair';
-    expect(fn () => app(HonorariumLedgerService::class)->recipients($defense))->toThrow(\Illuminate\Validation\ValidationException::class);
+    expect(fn () => app(HonorariumLedgerService::class)->recipients($defense))->toThrow(ValidationException::class);
 });
 
 test('a disbursement cannot predate the confirmed completion date', function () {

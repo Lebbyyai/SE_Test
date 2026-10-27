@@ -12,6 +12,11 @@ use Inertia\Inertia;
 
 class PanelistController extends Controller
 {
+    private function authorizeManagement(): void
+    {
+        abort_unless(in_array(auth()->user()?->role, ['Coordinator', 'Administrative Assistant', 'Dean', 'Super Admin']), 403);
+    }
+
     public function index()
     {
         return response()->json(Panelist::all());
@@ -19,6 +24,7 @@ class PanelistController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeManagement();
         $panelist = Panelist::create($request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:panelists,email',
@@ -36,6 +42,7 @@ class PanelistController extends Controller
 
     public function update(Request $request, $id)
     {
+        $this->authorizeManagement();
         $panelist = Panelist::findOrFail($id);
         $panelist->update($request->validate([
             'name' => 'required|string|max:255',
@@ -49,6 +56,7 @@ class PanelistController extends Controller
 
     public function destroy($id)
     {
+        $this->authorizeManagement();
         Panelist::findOrFail($id)->delete();
 
         return redirect()->route('panelists.view');
@@ -56,6 +64,7 @@ class PanelistController extends Controller
 
     public function bulkDelete(Request $request)
     {
+        $this->authorizeManagement();
         $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'integer',
@@ -67,6 +76,7 @@ class PanelistController extends Controller
 
     public function bulkUpdateStatus(Request $request)
     {
+        $this->authorizeManagement();
         $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'integer',

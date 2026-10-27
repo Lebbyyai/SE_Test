@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\UserSignature;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class UserSignatureController extends Controller
 {
@@ -17,47 +21,48 @@ class UserSignatureController extends Controller
 
     public function store(Request $r)
     {
-        // Delete all previous signatures and their files
-        $olds = UserSignature::where('user_id', $r->user()->id)->get();
-        foreach ($olds as $old) {
-            Storage::disk('public')->delete($old->image_path);
-            $old->delete();
-        }
-
-        if ($r->hasFile('image')) {
-            $r->validate(['image' => 'required|image|mimes:png|max:1024']);
-            $path = $r->file('image')->store('signatures/'.$r->user()->id, 'public');
-            $image = getimagesize($r->file('image')->getPathname());
-            $natural_width = $image[0] ?? null;
-            $natural_height = $image[1] ?? null;
-        } elseif ($r->input('image_base64')) {
-            $img = $r->input('image_base64');
-            if (! preg_match('/^data:image\/png;base64,/', $img)) {
-                return response()->json(['error' => 'Invalid image format'], 422);
-            }
-            $img = substr($img, strpos($img, ',') + 1);
-            $imgData = base64_decode($img);
-            if (strlen($imgData) > 1024 * 1024) {
-                return response()->json(['error' => 'Image too large'], 422);
-            }
-            $filename = 'signatures/'.$r->user()->id.'/drawn_'.uniqid().'.png';
-            Storage::disk('public')->put($filename, $imgData);
-            $path = $filename;
-            $image = getimagesizefromstring($imgData);
-            $natural_width = $image[0] ?? null;
-            $natural_height = $image[1] ?? null;
-        } else {
-            return response()->json(['error' => 'No image provided'], 422);
-        }
-
-        $sig = UserSignature::create([
-            'user_id' => $r->user()->id,
-            'image_path' => $path,
-            'label' => $r->input('label') ?? null,
-            'natural_width' => $natural_width,
-            'natural_height' => $natural_height,
-            'active' => true,
+        $data = $r->validate([
+            'image' => 'nullable|image|mimes:png|max:1024',
+            'image_base64' => 'nullable|string|max:1400000',
+            'label' => 'nullable|string|max:255',
         ]);
+        if ($r->hasFile('image')) {
+            $bytes = $r->file('image')->getContent();
+        } elseif (! empty($data['image_base64']) && preg_match('/^data:image\/png;base64,/', $data['image_base64'])) {
+            $bytes = base64_decode(substr($data['image_base64'], strpos($data['image_base64'], ',') + 1), true);
+        } else {
+            throw ValidationException::withMessages(['image' => 'Choose a PNG signature or draw a signature.']);
+        }
+        $image = is_string($bytes) ? @getimagesizefromstring($bytes) : false;
+        if ($image === false || $image[2] !== IMAGETYPE_PNG || strlen($bytes) > 1024 * 1024) {
+            throw ValidationException::withMessages(['image' => 'The signature must be a valid PNG up to 1 MB.']);
+        }
+        $path = 'signatures/'.$r->user()->id.'/'.Str::uuid().'.png';
+        if (! Storage::disk('public')->put($path, $bytes)) {
+            throw new \RuntimeException('Unable to save the signature file.');
+        }
+        $oldPaths = [];
+        try {
+            $sig = DB::transaction(function () use ($r, $data, $path, $image, &$oldPaths) {
+                User::whereKey($r->user()->id)->lockForUpdate()->firstOrFail();
+                $old = UserSignature::where('user_id', $r->user()->id)->get();
+                $oldPaths = $old->pluck('image_path')->all();
+                $sig = UserSignature::create([
+                    'user_id' => $r->user()->id, 'image_path' => $path,
+                    'label' => trim($data['label'] ?? '') ?: 'Signature',
+                    'natural_width' => $image[0], 'natural_height' => $image[1], 'active' => true,
+                ]);
+                foreach ($old as $previous) {
+                    $previous->delete();
+                }
+
+                return $sig;
+            });
+        } catch (\Throwable $error) {
+            Storage::disk('public')->delete($path);
+            throw $error;
+        }
+        Storage::disk('public')->delete($oldPaths);
 
         return response()->json($sig);
     }

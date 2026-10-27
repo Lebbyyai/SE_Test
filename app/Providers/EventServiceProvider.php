@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\User;
+use App\Observers\UserObserver;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
@@ -27,6 +29,6 @@ class EventServiceProvider extends ServiceProvider
         parent::boot();
 
         // register User observer to keep advisers in sync when users are created/updated
-        \App\Models\User::observe(\App\Observers\UserObserver::class);
+        User::observe(UserObserver::class);
     }
 }

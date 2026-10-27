@@ -7,6 +7,7 @@ use App\Models\HonorariumDisbursement;
 use App\Services\HonorariumAccess;
 use App\Services\HonorariumLedgerService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class HonorariumLedgerController extends Controller
@@ -27,7 +28,7 @@ class HonorariumLedgerController extends Controller
         $data = $request->validate(['school_year' => ['required', 'regex:/^20\d{2}-20\d{2}$/'], 'semester' => 'required|in:1st,2nd,Summer']);
         [$start,$end] = explode('-', $data['school_year']);
         if ((int) $end !== (int) $start + 1) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['school_year' => 'Use consecutive school years, for example 2026-2027.']);
+            throw ValidationException::withMessages(['school_year' => 'Use consecutive school years, for example 2026-2027.']);
         }
         $ledger->prepare($defenseRequest, $request->user(), $data);
 

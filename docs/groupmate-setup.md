@@ -5,7 +5,7 @@ This repository contains the integrated Defense Request, Comprehensive Exam, and
 ## 1. Install prerequisites
 
 - Git and VS Code.
-- XAMPP with PHP 8.2 or newer and MySQL/MariaDB. Enable the PHP extensions required by Composer, including PDO MySQL, fileinfo, mbstring, OpenSSL, XML, cURL, and zip.
+- XAMPP with PHP 8.2 or newer and MySQL/MariaDB. Enable the PHP extensions required by Composer, including PDO MySQL, fileinfo, mbstring, OpenSSL, XML, cURL, GD, and zip. For XAMPP, uncomment `extension=gd` in `C:\xampp\php\php.ini`, then restart PHP before running `composer install`. PDF generation now installs FPDF through Composer.
 - Composer 2 and Node.js 22 LTS with npm.
 - Make PHP available in your terminal PATH (normally `C:\xampp\php` on Windows).
 

@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -11,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
     /**
@@ -99,10 +101,10 @@ class User extends Authenticatable
      * Scope to find user by full name with flexible matching.
      * Handles names with or without middle names and normalizes whitespace.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @param  Builder  $query
      * @param  string  $fullName  The full name to search for
      * @param  string|null  $role  Optional role to filter by (e.g., 'Adviser')
-     * @return \Illuminate\Database\Eloquent\Builder
+     * @return Builder
      */
     public function scopeFindByFullName($query, $fullName, $role = null)
     {
@@ -272,12 +274,12 @@ class User extends Authenticatable
 
     public function role()
     {
-        return $this->belongsTo(\App\Models\Role::class);
+        return $this->belongsTo(Role::class);
     }
 
     public function coordinatorPrograms()
     {
-        return $this->hasMany(\App\Models\CoordinatorProgram::class, 'coordinator_id');
+        return $this->hasMany(CoordinatorProgram::class, 'coordinator_id');
     }
 
     public function isRole(string $name): bool
@@ -377,7 +379,7 @@ class User extends Authenticatable
             try {
                 // Only attempt reconciliation for adviser users
                 if (in_array($user->role, ['Adviser'])) {
-                    $adviserRows = \App\Models\Adviser::where('email', $user->email)->get();
+                    $adviserRows = Adviser::where('email', $user->email)->get();
                     foreach ($adviserRows as $row) {
                         // Attach coordinator pivot for the newly created user so the adviser "sees" their coordinators
                         if (! empty($row->coordinator_id) && method_exists($user, 'coordinators')) {
@@ -399,7 +401,7 @@ class User extends Authenticatable
 
     public function isActiveAdviser(): bool
     {
-        return \App\Models\Adviser::where('user_id', $this->id)
+        return Adviser::where('user_id', $this->id)
             ->where('status', 'active')
             ->exists();
     }

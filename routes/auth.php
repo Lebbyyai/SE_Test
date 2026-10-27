@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\AuthenticatedSessionV2Controller;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
@@ -32,9 +33,9 @@ Route::middleware('guest')->group(function () {
         ->middleware('throttle:20,1')->name('auth.google.callback');
 
     // V2 Debug login (no OAuth) - only enabled when DEBUG_LOGIN_V2=true or APP_ENV != production
-    Route::get('login-v2', [\App\Http\Controllers\Auth\AuthenticatedSessionV2Controller::class, 'create'])
+    Route::get('login-v2', [AuthenticatedSessionV2Controller::class, 'create'])
         ->name('login.v2.get');
-    Route::post('login-v2', [\App\Http\Controllers\Auth\AuthenticatedSessionV2Controller::class, 'store'])
+    Route::post('login-v2', [AuthenticatedSessionV2Controller::class, 'store'])
         ->name('login.v2');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])

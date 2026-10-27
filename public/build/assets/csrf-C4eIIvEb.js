@@ -1,0 +1,1 @@
+function c(o=!1){var n;const t=document.cookie.split("; ").find(s=>s.startsWith("XSRF-TOKEN=")),e={Accept:"application/json","X-Requested-With":"XMLHttpRequest"};return t?e["X-XSRF-TOKEN"]=decodeURIComponent(t.substring(11)):e["X-CSRF-TOKEN"]=((n=document.querySelector('meta[name="csrf-token"]'))==null?void 0:n.content)??"",o&&(e["Content-Type"]="application/json"),e}export{c};

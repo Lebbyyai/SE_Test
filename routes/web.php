@@ -1,31 +1,53 @@
 <?php
 
+use App\Helpers\ProgramLevel;
 use App\Http\Controllers\AA\PaymentVerificationController;
 use App\Http\Controllers\AcademicRecordController;
+use App\Http\Controllers\Admin\UserRoleController;
 use App\Http\Controllers\AdviserStudentController;
+use App\Http\Controllers\Api\ComprehensiveExamEligibilityController;
+use App\Http\Controllers\Api\StudentSearchController;
 use App\Http\Controllers\ComprehensiveExamController;
 use App\Http\Controllers\CoordinatorAdviserController;
 use App\Http\Controllers\CoordinatorCompreExamController;
 use App\Http\Controllers\CoordinatorComprePaymentController;
 use App\Http\Controllers\CoordinatorDefenseController;
+use App\Http\Controllers\CoordinatorProgramAssignmentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DebugController;
+use App\Http\Controllers\DefenseCorrectionController;
+use App\Http\Controllers\DefenseRegisterController;
 use App\Http\Controllers\DefenseRequestController;
 use App\Http\Controllers\DefenseRequirementController;
+use App\Http\Controllers\DefenseScheduleController;
 use App\Http\Controllers\DocumentTemplateController;
 use App\Http\Controllers\EmailsController;
+use App\Http\Controllers\FinanceDocumentWorkflowController;
 use App\Http\Controllers\GeneratedDocumentController;
+use App\Http\Controllers\HonorariumLedgerController;
 use App\Http\Controllers\HonorariumSummaryController;
+use App\Http\Controllers\HonorariumWorkspaceController;
+use App\Http\Controllers\InstructorClassListController;
+use App\Http\Controllers\LegacyLinkController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PanelistController;
 use App\Http\Controllers\PanelistHonorariumSpecController;
+use App\Http\Controllers\PaymentRateController;
 use App\Http\Controllers\PaymentSubmissionController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ScheduleEventController;
+use App\Http\Controllers\StudentDocumentController;
 use App\Http\Controllers\StudentRecordController;
+use App\Http\Controllers\SystemStatusController;
 use App\Http\Controllers\UserSignatureController;
+use App\Mail\AdviserInvitation;
+use App\Models\AaPaymentVerification;
 use App\Models\DefenseRequest;
+use App\Models\DocumentTemplate;
+use App\Models\Panelist;
 use App\Models\PaymentRate;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -70,9 +92,9 @@ Route::get('/test-upload-limits', function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/coordinator/defense-requests/all-defense-requests', [\App\Http\Controllers\DefenseRequestController::class, 'allForCoordinator'])->middleware('auth');
+    Route::get('/coordinator/defense-requests/all-defense-requests', [DefenseRequestController::class, 'allForCoordinator'])->middleware('auth');
     Route::get('/api/coordinator/code', [CoordinatorAdviserController::class, 'getCoordinatorCode']);
-    Route::post('/api/adviser/register-with-coordinator-code', [\App\Http\Controllers\CoordinatorAdviserController::class, 'registerWithCode']);
+    Route::post('/api/adviser/register-with-coordinator-code', [CoordinatorAdviserController::class, 'registerWithCode']);
 
     // Coordinator Adviser Management Routes
     Route::get('/api/coordinator/advisers', [CoordinatorAdviserController::class, 'index']);
@@ -83,10 +105,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/api/coordinator/advisers/{id}', [CoordinatorAdviserController::class, 'destroy']);
 
     // Coordinator manages adviser-student relationships (use CoordinatorAdviserController)
-    Route::get('/api/coordinator/advisers/{adviser}/students', [\App\Http\Controllers\CoordinatorAdviserController::class, 'students']);
-    Route::get('/api/coordinator/advisers/{adviser}/pending-students', [\App\Http\Controllers\CoordinatorAdviserController::class, 'pendingStudents']);
-    Route::post('/api/coordinator/advisers/{adviser}/students', [\App\Http\Controllers\CoordinatorAdviserController::class, 'storeStudent']);
-    Route::delete('/api/coordinator/advisers/{adviser}/students/{student}', [\App\Http\Controllers\CoordinatorAdviserController::class, 'destroyStudent']);
+    Route::get('/api/coordinator/advisers/{adviser}/students', [CoordinatorAdviserController::class, 'students']);
+    Route::get('/api/coordinator/advisers/{adviser}/pending-students', [CoordinatorAdviserController::class, 'pendingStudents']);
+    Route::post('/api/coordinator/advisers/{adviser}/students', [CoordinatorAdviserController::class, 'storeStudent']);
+    Route::delete('/api/coordinator/advisers/{adviser}/students/{student}', [CoordinatorAdviserController::class, 'destroyStudent']);
     Route::get('/api/coordinator/students/search', [CoordinatorAdviserController::class, 'searchStudents']);
 
     Route::get('/panelists/honorarium-specs', [PanelistHonorariumSpecController::class, 'index']);
@@ -103,18 +125,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     });
 
-    Route::get('/assistant/defense-batches', [\App\Http\Controllers\Assistant\DefenseBatchController::class, 'index']);
-    Route::post('/assistant/defense-batches', [\App\Http\Controllers\Assistant\DefenseBatchController::class, 'store']);
-    Route::post('/assistant/defense-batches/{batch}/status', [\App\Http\Controllers\Assistant\DefenseBatchController::class, 'updateStatus']);
-
     // PAYMENT RATESS ETC.
-    Route::get('/dean/payment-rates/export', [\App\Http\Controllers\PaymentRateController::class, 'export'])->name('dean.payment-rates.export');
-    Route::post('/dean/payment-rates/import', [\App\Http\Controllers\PaymentRateController::class, 'import'])->name('dean.payment-rates.import');
-    Route::post('/dean/payment-rates', [\App\Http\Controllers\PaymentRateController::class, 'update'])
+    Route::get('/dean/payment-rates/export', [PaymentRateController::class, 'export'])->name('dean.payment-rates.export');
+    Route::post('/dean/payment-rates/import', [PaymentRateController::class, 'import'])->name('dean.payment-rates.import');
+    Route::post('/dean/payment-rates', [PaymentRateController::class, 'update'])
         ->name('dean.payment-rates.update');
-    Route::get('/dean/payment-rates', [\App\Http\Controllers\PaymentRateController::class, 'index'])
+    Route::get('/dean/payment-rates', [PaymentRateController::class, 'index'])
         ->name('dean.payment-rates.index');
-    Route::get('/dean/payment-rates/data', [\App\Http\Controllers\PaymentRateController::class, 'data'])
+    Route::get('/dean/payment-rates/data', [PaymentRateController::class, 'data'])
         ->name('dean.payment-rates.data');
 
     // Settings: Document Templates (Dean / Coordinator only)
@@ -124,7 +142,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return Inertia::render('settings/documents/Index');
     })->name('settings.documents');
 
-    Route::get('/settings/documents/{template}/edit', function (\App\Models\DocumentTemplate $template) {
+    Route::get('/settings/documents/{template}/edit', function (DocumentTemplate $template) {
         abort_unless(in_array(Auth::user()->role, ['Dean', 'Super Admin']), 403);
 
         return Inertia::render('settings/documents/TemplateEditor', [
@@ -161,20 +179,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::patch('/admin/users/{user}/role', [\App\Http\Controllers\Admin\UserRoleController::class, 'update'])
+    Route::patch('/admin/users/{user}/role', [UserRoleController::class, 'update'])
         ->middleware('throttle:30,1')->name('admin.users.role.update');
 
     /* Coordinator Program Assignments - Super Admin only */
     Route::prefix('api/coordinator-assignments')->group(function () {
-        Route::get('/', [\App\Http\Controllers\CoordinatorProgramAssignmentController::class, 'index'])->name('coordinator-assignments.index');
-        Route::get('/coordinators', [\App\Http\Controllers\CoordinatorProgramAssignmentController::class, 'getCoordinators'])->name('coordinator-assignments.coordinators');
-        Route::get('/programs', [\App\Http\Controllers\CoordinatorProgramAssignmentController::class, 'getAvailablePrograms'])->name('coordinator-assignments.programs');
-        Route::post('/', [\App\Http\Controllers\CoordinatorProgramAssignmentController::class, 'store'])->name('coordinator-assignments.store');
-        Route::delete('/{id}', [\App\Http\Controllers\CoordinatorProgramAssignmentController::class, 'destroy'])->name('coordinator-assignments.destroy');
+        Route::get('/', [CoordinatorProgramAssignmentController::class, 'index'])->name('coordinator-assignments.index');
+        Route::get('/coordinators', [CoordinatorProgramAssignmentController::class, 'getCoordinators'])->name('coordinator-assignments.coordinators');
+        Route::get('/programs', [CoordinatorProgramAssignmentController::class, 'getAvailablePrograms'])->name('coordinator-assignments.programs');
+        Route::post('/', [CoordinatorProgramAssignmentController::class, 'store'])->name('coordinator-assignments.store');
+        Route::delete('/{id}', [CoordinatorProgramAssignmentController::class, 'destroy'])->name('coordinator-assignments.destroy');
     });
 
     // Logout
-    Route::post('/logout', function (\Illuminate\Http\Request $r) {
+    Route::post('/logout', function (Illuminate\Http\Request $r) {
         Auth::logout();
         $r->session()->invalidate();
         $r->session()->regenerateToken();
@@ -184,22 +202,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     /* Notifications */
     Route::get('/notification', [NotificationController::class, 'index'])->name('notification.index');
-    Route::get('/honorarium-ledger', [\App\Http\Controllers\HonorariumLedgerController::class, 'index'])->name('honorarium-ledger.index');
-    Route::get('/defense-register', [\App\Http\Controllers\DefenseRegisterController::class, 'index'])->name('defense-register.index');
-    Route::get('/defense-register/export', [\App\Http\Controllers\DefenseRegisterController::class, 'export'])->name('defense-register.export');
-    Route::get('/defense-register/print', [\App\Http\Controllers\DefenseRegisterController::class, 'print'])->name('defense-register.print');
-    Route::patch('/defense-register/{defenseRequest}/panel-types', [\App\Http\Controllers\DefenseRegisterController::class, 'classify'])->name('defense-register.classify');
-    Route::post('/defense-register/{defenseRequest}/confirm-service', [\App\Http\Controllers\DefenseRegisterController::class, 'confirm'])->name('defense-register.confirm');
-    Route::post('/honorarium-ledger/{defenseRequest}/prepare', [\App\Http\Controllers\HonorariumLedgerController::class, 'prepare'])->name('honorarium-ledger.prepare');
-    Route::patch('/honorarium-ledger/{disbursement}', [\App\Http\Controllers\HonorariumLedgerController::class, 'update'])->name('honorarium-ledger.update');
+    Route::get('/honorarium-ledger', [HonorariumLedgerController::class, 'index'])->name('honorarium-ledger.index');
+    Route::get('/defense-register', [DefenseRegisterController::class, 'index'])->name('defense-register.index');
+    Route::get('/defense-register/export', [DefenseRegisterController::class, 'export'])->name('defense-register.export');
+    Route::get('/defense-register/print', [DefenseRegisterController::class, 'print'])->name('defense-register.print');
+    Route::patch('/defense-register/{defenseRequest}/panel-types', [DefenseRegisterController::class, 'classify'])->name('defense-register.classify');
+    Route::post('/defense-register/{defenseRequest}/confirm-service', [DefenseRegisterController::class, 'confirm'])->name('defense-register.confirm');
+    Route::post('/honorarium-ledger/{defenseRequest}/prepare', [HonorariumLedgerController::class, 'prepare'])->name('honorarium-ledger.prepare');
+    Route::patch('/honorarium-ledger/{disbursement}', [HonorariumLedgerController::class, 'update'])->name('honorarium-ledger.update');
     // Honorarium module additions, preserving the defense and comprehensive exam routes.
-    Route::get('/honorarium-workspace', [\App\Http\Controllers\HonorariumWorkspaceController::class, 'index'])->name('honorarium-workspace.index');
-    Route::post('/honorarium-workspace/{defenseRequest}/submit-to-finance', [\App\Http\Controllers\HonorariumWorkspaceController::class, 'submitToFinance'])->name('honorarium-workspace.submit-to-finance');
-    Route::post('/honorarium-workspace/finance/{submission}/status', [\App\Http\Controllers\HonorariumWorkspaceController::class, 'updateFinanceStatus'])->name('honorarium-workspace.finance-status');
-    Route::get('/honorarium-documents', [\App\Http\Controllers\FinanceDocumentWorkflowController::class, 'index'])->name('honorarium-documents.index');
-    Route::post('/honorarium-documents/{defenseRequest}/submit-one', [\App\Http\Controllers\FinanceDocumentWorkflowController::class, 'submitFirst'])->name('honorarium-documents.submit-one');
-    Route::post('/honorarium-documents/{defenseRequest}/submit-two', [\App\Http\Controllers\FinanceDocumentWorkflowController::class, 'submitSecond'])->name('honorarium-documents.submit-two');
-    Route::post('/honorarium-documents/finance/{submission}/review', [\App\Http\Controllers\FinanceDocumentWorkflowController::class, 'review'])->name('honorarium-documents.review');
+    Route::get('/honorarium-workspace', [HonorariumWorkspaceController::class, 'index'])->name('honorarium-workspace.index');
+    Route::post('/honorarium-workspace/{defenseRequest}/submit-to-finance', [HonorariumWorkspaceController::class, 'submitToFinance'])->name('honorarium-workspace.submit-to-finance');
+    Route::post('/honorarium-workspace/finance/{submission}/status', [HonorariumWorkspaceController::class, 'updateFinanceStatus'])->name('honorarium-workspace.finance-status');
+    Route::get('/honorarium-documents', [FinanceDocumentWorkflowController::class, 'index'])->name('honorarium-documents.index');
+    Route::post('/honorarium-documents/{defenseRequest}/submit-one', [FinanceDocumentWorkflowController::class, 'submitFirst'])->name('honorarium-documents.submit-one');
+    Route::post('/honorarium-documents/{defenseRequest}/submit-two', [FinanceDocumentWorkflowController::class, 'submitSecond'])->name('honorarium-documents.submit-two');
+    Route::post('/honorarium-documents/finance/{submission}/review', [FinanceDocumentWorkflowController::class, 'review'])->name('honorarium-documents.review');
     Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('/notifications/feed', [NotificationController::class, 'feed'])->name('notifications.feed');
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
@@ -223,8 +241,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     /* Defense Requirements (student submit) */
     Route::get('/defense-requirements', [DefenseRequirementController::class, 'index'])->name('defense-requirements.index');
-    Route::post('/defense-requests/{defenseRequest}/request-corrections', [\App\Http\Controllers\DefenseCorrectionController::class, 'requestCorrections'])->name('defense-requests.request-corrections');
-    Route::post('/defense-requirements/{defenseRequest}/resubmit', [\App\Http\Controllers\DefenseCorrectionController::class, 'resubmit'])->name('defense-requirements.resubmit');
+    Route::post('/defense-requests/{defenseRequest}/request-corrections', [DefenseCorrectionController::class, 'requestCorrections'])->name('defense-requests.request-corrections');
+    Route::post('/defense-requirements/{defenseRequest}/resubmit', [DefenseCorrectionController::class, 'resubmit'])->name('defense-requirements.resubmit');
     Route::post('/defense-requirements', [DefenseRequirementController::class, 'store'])->name('defense-requirements.store');
     Route::post('/defense-requirements/{id}/unsubmit', [DefenseRequirementController::class, 'unsubmit'])
         ->name('defense-requirements.unsubmit');
@@ -303,7 +321,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     /* Resource (keep after specific routes) */
     Route::resource('defense-requests', DefenseRequestController::class)
-        ->except(['index', 'create', 'edit']);
+        ->only(['store', 'show']);
 
     /* Panelists CRUD */
     Route::get('/panelists', [PanelistController::class, 'view'])->name('panelists.view');
@@ -338,7 +356,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     /* System Status */
     Route::get('/system-status', fn () => Inertia::render('system-status'))->name('system-status');
-    Route::get('/system-status/checks', \App\Http\Controllers\SystemStatusController::class)->name('system-status.checks');
+    Route::get('/system-status/checks', SystemStatusController::class)->name('system-status.checks');
 
     /* Coordinator Defense Management */
     Route::prefix('coordinator')->name('coordinator.')->group(function () {
@@ -357,13 +375,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/defense-requests/approval', [CoordinatorDefenseController::class, 'getRequestsForApproval'])
             ->name('defense-requests.approval');
 
-        Route::get('/schedule', [\App\Http\Controllers\DefenseScheduleController::class, 'index'])
+        Route::get('/schedule', [DefenseScheduleController::class, 'index'])
             ->name('schedule.index');
-        Route::get('/schedule/calendar', [\App\Http\Controllers\DefenseScheduleController::class, 'calendar'])
+        Route::get('/schedule/calendar', [DefenseScheduleController::class, 'calendar'])
             ->name('schedule.calendar');
-        Route::post('/schedule/check-conflicts', [\App\Http\Controllers\DefenseScheduleController::class, 'checkConflicts'])
+        Route::post('/schedule/check-conflicts', [DefenseScheduleController::class, 'checkConflicts'])
             ->name('schedule.check-conflicts');
-        Route::get('/schedule/available-panelists', [\App\Http\Controllers\DefenseScheduleController::class, 'availablePanelists'])
+        Route::get('/schedule/available-panelists', [DefenseScheduleController::class, 'availablePanelists'])
             ->name('schedule.available-panelists');
 
         Route::get('/defense-requests/all', [CoordinatorDefenseController::class, 'allDefenseRequests'])
@@ -430,7 +448,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'coordinator_status' => $defenseRequest->coordinator_status ?? null,
 
                 // ADD: exact level for rate matching
-                'program_level' => \App\Helpers\ProgramLevel::getLevel($defenseRequest->program),
+                'program_level' => ProgramLevel::getLevel($defenseRequest->program),
             ];
 
             return Inertia::render('coordinator/submissions/defense-request/details', [
@@ -487,7 +505,7 @@ Route::middleware(['auth'])->group(function () {
 | Public / Shared API
 |--------------------------------------------------------------------------
 */
-Route::get('/api/adviser-search', function (\Illuminate\Http\Request $request) {
+Route::get('/api/adviser-search', function (Illuminate\Http\Request $request) {
     $q = $request->input('q', '');
 
     return User::where(function ($query) use ($q) {
@@ -503,7 +521,7 @@ Route::get('/api/adviser-search', function (\Illuminate\Http\Request $request) {
 })->name('api.adviser-search');
 
 // Keep existing bookmarks/clients working while new screens use adviser URLs.
-Route::get('/api/faculty-search', fn (\Illuminate\Http\Request $request) => redirect()->route('api.adviser-search', $request->query())
+Route::get('/api/faculty-search', fn (Illuminate\Http\Request $request) => redirect()->route('api.adviser-search', $request->query())
 )->name('api.faculty-search');
 
 Route::get('/api/coordinator/defense-requests', function () {
@@ -542,23 +560,23 @@ Route::get('/legacy/academic-records', [AcademicRecordController::class, 'index'
     ->name('legacy.academic-records.index');
 Route::get('/legacy/academic-records/dashboard', fn () => Inertia::render('legacy/AcademicRecordsDashboard'))
     ->name('legacy.academic-records.dashboard');
-Route::get('/legacy/link', [\App\Http\Controllers\LegacyLinkController::class, 'form'])->name('legacy.link.form');
-Route::post('/legacy/link', [\App\Http\Controllers\LegacyLinkController::class, 'link'])->name('legacy.link.submit');
-Route::delete('/legacy/link', [\App\Http\Controllers\LegacyLinkController::class, 'unlink'])->name('legacy.link.unlink');
-Route::get('/adviser/class-list', [\App\Http\Controllers\InstructorClassListController::class, 'page'])
+Route::get('/legacy/link', [LegacyLinkController::class, 'form'])->name('legacy.link.form');
+Route::post('/legacy/link', [LegacyLinkController::class, 'link'])->name('legacy.link.submit');
+Route::delete('/legacy/link', [LegacyLinkController::class, 'unlink'])->name('legacy.link.unlink');
+Route::get('/adviser/class-list', [InstructorClassListController::class, 'page'])
     ->name('adviser.class-list.page');
-Route::get('/legacy/adviser/class-list', [\App\Http\Controllers\InstructorClassListController::class, 'index'])
+Route::get('/legacy/adviser/class-list', [InstructorClassListController::class, 'index'])
     ->name('legacy.adviser.class-list');
 Route::redirect('/faculty/class-list', '/adviser/class-list')->name('faculty.class-list.page');
-Route::get('/legacy/faculty/class-list', [\App\Http\Controllers\InstructorClassListController::class, 'index'])
+Route::get('/legacy/faculty/class-list', [InstructorClassListController::class, 'index'])
     ->name('legacy.faculty.class-list');
 
 // Temporary test route for comprehensive exam eligibility
-Route::get('/test-eligibility', [\App\Http\Controllers\Api\ComprehensiveExamEligibilityController::class, 'checkEligibility'])
+Route::get('/test-eligibility', [ComprehensiveExamEligibilityController::class, 'checkEligibility'])
     ->middleware('auth');
 
 // Debug route to check academic records data
-Route::get('/debug-academic-records', [\App\Http\Controllers\DebugController::class, 'academicRecordsDebug'])
+Route::get('/debug-academic-records', [DebugController::class, 'academicRecordsDebug'])
     ->middleware('auth');
 
 /*
@@ -580,23 +598,23 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/adviser/code', [AdviserStudentController::class, 'getAdviserCode']);
     Route::delete('/api/adviser/students/{student}', [AdviserStudentController::class, 'destroy']);
 
-    Route::get('/api/advisers', [\App\Http\Controllers\CoordinatorAdviserController::class, 'all'])->name('api.advisers');
+    Route::get('/api/advisers', [CoordinatorAdviserController::class, 'all'])->name('api.advisers');
     Route::middleware(['auth'])->get('/api/adviser/has-students', [AdviserStudentController::class, 'hasStudents']);
 
-    Route::get('/api/panelists', [\App\Http\Controllers\PanelistController::class, 'index'])->name('api.panelists');
+    Route::get('/api/panelists', [PanelistController::class, 'index'])->name('api.panelists');
 
     Route::get('/api/adviser/pending-students', [AdviserStudentController::class, 'pending']);
     Route::post('/api/adviser/pending-students/{student}/accept', [AdviserStudentController::class, 'acceptPending']);
     Route::post('/api/adviser/pending-students/{student}/reject', [AdviserStudentController::class, 'rejectPending']);
 
     // Student search for autocomplete
-    Route::get('/api/students/search', [App\Http\Controllers\Api\StudentSearchController::class, 'search']);
+    Route::get('/api/students/search', [StudentSearchController::class, 'search']);
 
     // Comprehensive exam eligibility API
-    Route::get('/api/comprehensive-exam/eligibility', [App\Http\Controllers\Api\ComprehensiveExamEligibilityController::class, 'checkEligibility']);
+    Route::get('/api/comprehensive-exam/eligibility', [ComprehensiveExamEligibilityController::class, 'checkEligibility']);
 
     // Manual data scraping endpoint for testing
-    Route::post('/api/comprehensive-exam/scrape-data', [App\Http\Controllers\Api\ComprehensiveExamEligibilityController::class, 'manualDataScraping']);
+    Route::post('/api/comprehensive-exam/scrape-data', [ComprehensiveExamEligibilityController::class, 'manualDataScraping']);
 
 });
 
@@ -607,7 +625,7 @@ Route::get('/adviser/defense-requirements/{id}/details', function ($id) {
         abort(403);
     }
 
-    $defenseRequest = \App\Models\DefenseRequest::findOrFail($id);
+    $defenseRequest = DefenseRequest::findOrFail($id);
 
     // Fetch all coordinators linked to this adviser
     $coordinators = $user->coordinators()
@@ -635,7 +653,7 @@ Route::post('/adviser/defense-requirements/{defenseRequest}/documents', [Defense
     ->name('adviser.defense-requirements.upload-documents');
 
 Route::post('/adviser/defense-requirements/{id}/endorsement-form', function ($id) {
-    $req = \App\Models\DefenseRequest::findOrFail($id);
+    $req = DefenseRequest::findOrFail($id);
     $url = request('url');
     if (! $url) {
         return response()->json(['error' => 'No URL provided'], 422);
@@ -656,7 +674,7 @@ Route::post('/adviser/defense-requirements/{id}/endorsement-form', function ($id
 Route::post('/api/generate-document', [GeneratedDocumentController::class, 'generateDocument']);
 
 /* Update Adviser Status for Defense Requirements */
-Route::patch('/adviser/defense-requirements/{defenseRequest}/adviser-status', [\App\Http\Controllers\DefenseRequestController::class, 'updateAdviserStatus'])
+Route::patch('/adviser/defense-requirements/{defenseRequest}/adviser-status', [DefenseRequestController::class, 'updateAdviserStatus'])
     ->name('adviser.defense-requirements.update-adviser-status');
 
 Route::get('/assistant/all-defense-list', function () {
@@ -685,7 +703,7 @@ Route::get('/assistant/all-defense-list/{id}/details', function ($id) {
     $defenseRequest = DefenseRequest::findOrFail($id);
 
     // Get program level using helper
-    $programLevel = \App\Helpers\ProgramLevel::getLevel($defenseRequest->program);
+    $programLevel = ProgramLevel::getLevel($defenseRequest->program);
 
     // Sum all rates for this program level and defense type
     $expectedTotal = PaymentRate::where('program_level', $programLevel)
@@ -709,7 +727,7 @@ Route::get('/assistant/all-defense-list/{id}/details', function ($id) {
         ->filter()
         ->map(function ($panelistIdOrName) {
             if (is_numeric($panelistIdOrName)) {
-                $p = \App\Models\Panelist::find($panelistIdOrName);
+                $p = Panelist::find($panelistIdOrName);
                 if ($p) {
                     return ['id' => $p->id, 'name' => $p->name];
                 }
@@ -738,7 +756,7 @@ Route::get('/assistant/all-defense-list/{id}/details', function ($id) {
             'defense_mode' => $defenseRequest->defense_mode,
             'mode_defense' => $defenseRequest->defense_mode,
             'adviser' => $defenseRequest->defense_adviser ?? '—',
-            'submitted_at' => $defenseRequest->submitted_at ? \Carbon\Carbon::parse($defenseRequest->submitted_at)->format('Y-m-d H:i:s') : null,
+            'submitted_at' => $defenseRequest->submitted_at ? Carbon::parse($defenseRequest->submitted_at)->format('Y-m-d H:i:s') : null,
             'coordinator_status' => $defenseRequest->coordinator_status,
             'expected_rate' => $expectedTotal,
             'amount' => $defenseRequest->amount ?? null,
@@ -765,14 +783,14 @@ Route::middleware(['auth'])->get('/api/adviser/coordinators', function (Request 
     return response()->json(['coordinators' => $coordinators]);
 });
 
-Route::middleware(['auth'])->get('/api/adviser/registered-coordinator', [\App\Http\Controllers\CoordinatorAdviserController::class, 'getRegisteredCoordinator']);
+Route::middleware(['auth'])->get('/api/adviser/registered-coordinator', [CoordinatorAdviserController::class, 'getRegisteredCoordinator']);
 
 /*
 |--------------------------------------------------------------------------
 | Student Documents
 |--------------------------------------------------------------------------
 */
-Route::get('/student/documents', [\App\Http\Controllers\StudentDocumentController::class, 'index'])
+Route::get('/student/documents', [StudentDocumentController::class, 'index'])
     ->name('student.documents');
 
 Route::put('/test-put', function () {
@@ -785,7 +803,7 @@ Route::get('/assistant/all-defense-list/data', function () {
         abort(403);
     }
 
-    $rows = \App\Models\DefenseRequest::query()
+    $rows = DefenseRequest::query()
         ->where('coordinator_status', 'Approved')
         ->orderByDesc('created_at')
         ->limit(500)
@@ -815,15 +833,15 @@ Route::get('/assistant/all-defense-list/data', function () {
         ->map(function ($r) {
             $expectedTotal = 0;
             if ($r->program && $r->defense_type) {
-                $programLevel = \App\Helpers\ProgramLevel::getLevel($r->program);
-                $expectedTotal = \App\Models\PaymentRate::where('program_level', $programLevel)
+                $programLevel = ProgramLevel::getLevel($r->program);
+                $expectedTotal = PaymentRate::where('program_level', $programLevel)
                     ->where('defense_type', $r->defense_type)
                     ->sum('amount');
             }
 
             $coordinator = null;
             if ($r->coordinator_user_id) {
-                $coordUser = \App\Models\User::find($r->coordinator_user_id);
+                $coordUser = User::find($r->coordinator_user_id);
                 if ($coordUser) {
                     $coordinator = trim(
                         $coordUser->first_name.' '.
@@ -833,7 +851,7 @@ Route::get('/assistant/all-defense-list/data', function () {
                 }
             }
 
-            $aaVerification = \App\Models\AaPaymentVerification::where('defense_request_id', $r->id)->first();
+            $aaVerification = AaPaymentVerification::where('defense_request_id', $r->id)->first();
             $aa_verification_status = $aaVerification ? $aaVerification->status : null;
             $aa_verification_id = $aaVerification ? $aaVerification->id : null; // <-- ADD THIS
 
@@ -855,7 +873,7 @@ Route::get('/assistant/all-defense-list/data', function () {
                 'defense_mode' => $r->defense_mode,
                 'mode_defense' => $r->defense_mode,
                 'adviser' => $r->defense_adviser ?? '—',
-                'submitted_at' => $r->submitted_at ? \Carbon\Carbon::parse($r->submitted_at)->format('Y-m-d H:i:s') : null,
+                'submitted_at' => $r->submitted_at ? Carbon::parse($r->submitted_at)->format('Y-m-d H:i:s') : null,
                 'coordinator_status' => $r->coordinator_status,
                 'expected_rate' => $expectedTotal,
                 'amount' => $r->amount ?? null,
@@ -871,7 +889,7 @@ Route::get('/assistant/all-defense-list/data', function () {
 
 // Test route to preview adviser invitation email
 Route::get('/test-adviser-invitation', function () {
-    return new App\Mail\AdviserInvitation(
+    return new AdviserInvitation(
         'Dr. Juan Dela Cruz',
         'Dr. Maria Santos (Coordinator)'
     );

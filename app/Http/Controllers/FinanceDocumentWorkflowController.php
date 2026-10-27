@@ -9,6 +9,7 @@ use App\Models\Notification;
 use App\Models\User;
 use App\Services\FinanceDocumentWorkflowService;
 use App\Services\HonorariumAccess;
+use App\Services\HonorariumLedgerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -99,7 +100,7 @@ class FinanceDocumentWorkflowController extends Controller
             abort_unless(in_array($doc->status, ['ready', 'rejected'], true), 422, 'The panel breakdown is not ready or has already been sent.');
             $names = $access->panelNames($dr);
             abort_unless(count($names) > 0, 422, 'Assign panelists before sending the breakdown.');
-            $details = collect(app(\App\Services\HonorariumLedgerService::class)->recipients($dr))->where('recipient_role', '!=', 'Adviser')->map(fn ($person) => ['name' => $person['recipient_name'], 'role' => $person['recipient_role'], 'affiliation' => $dr->panel_affiliations[$person['recipient_key']] ?? 'unclassified'])->values()->all();
+            $details = collect(app(HonorariumLedgerService::class)->recipients($dr))->where('recipient_role', '!=', 'Adviser')->map(fn ($person) => ['name' => $person['recipient_name'], 'role' => $person['recipient_role'], 'affiliation' => $dr->panel_affiliations[$person['recipient_key']] ?? 'unclassified'])->values()->all();
             $doc->update(['status' => 'submitted', 'payload' => ['panel_names' => $names, 'panel_affiliations' => $dr->panel_affiliations ?? [], 'panel_details' => $details], 'submitted_by' => auth()->id(), 'submitted_at' => now(), 'finance_notes' => null, 'reviewed_by' => null, 'reviewed_at' => null]);
             $this->activity($dr, $doc, 'document_submitted', 'Panel breakdown sent to Finance', 'Current panel names: '.implode(', ', $names));
             $this->notice($dr, 'Panel Breakdown for Review', 'A defense panel breakdown is awaiting Finance verification.', ['Finance', 'Finance Office', 'Finance Officer']);

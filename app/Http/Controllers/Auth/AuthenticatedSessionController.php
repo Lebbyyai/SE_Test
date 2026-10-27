@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Models\Adviser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,7 +37,7 @@ class AuthenticatedSessionController extends Controller
         // Update adviser status if matching adviser exists
         $user = Auth::user();
         if ($user) {
-            $adviser = \App\Models\Adviser::where('email', $user->email)->first();
+            $adviser = Adviser::where('email', $user->email)->first();
             if ($adviser) {
                 $adviser->status = 'active';
                 $adviser->user_id = $user->id;

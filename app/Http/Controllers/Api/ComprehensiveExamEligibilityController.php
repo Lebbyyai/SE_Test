@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\LegacyAcademicRecord;
+use App\Models\LegacyClearanceStatus;
 use App\Services\LegacyPortalClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -169,7 +171,7 @@ class ComprehensiveExamEligibilityController extends Controller
     {
         try {
             // Get ALL academic records for the user from database
-            $records = \App\Models\LegacyAcademicRecord::where('user_id', $user->id)
+            $records = LegacyAcademicRecord::where('user_id', $user->id)
                 ->get();
 
             if ($records->isEmpty()) {
@@ -260,7 +262,7 @@ class ComprehensiveExamEligibilityController extends Controller
             }
 
             // Get clearance statuses for current semester from database
-            $clearanceStatuses = \App\Models\LegacyClearanceStatus::where('user_id', $user->id)
+            $clearanceStatuses = LegacyClearanceStatus::where('user_id', $user->id)
                 ->where('semester_id', $currentSemesterId)
                 ->get();
 
@@ -379,7 +381,7 @@ class ComprehensiveExamEligibilityController extends Controller
             }
 
             // Get Cashier clearance status from database
-            $cashierClearance = \App\Models\LegacyClearanceStatus::where('user_id', $user->id)
+            $cashierClearance = LegacyClearanceStatus::where('user_id', $user->id)
                 ->where('semester_id', $currentSemesterId)
                 ->where('area', 'Cashier')
                 ->first();
@@ -470,7 +472,7 @@ class ComprehensiveExamEligibilityController extends Controller
     {
         try {
             // Try to get the latest semester from academic records
-            $latestRecord = \App\Models\LegacyAcademicRecord::where('user_id', $user->id)
+            $latestRecord = LegacyAcademicRecord::where('user_id', $user->id)
                 ->orderBy('semester_id', 'desc')
                 ->first();
 
@@ -479,7 +481,7 @@ class ComprehensiveExamEligibilityController extends Controller
             }
 
             // Fallback: try clearance data
-            $latestClearance = \App\Models\LegacyClearanceStatus::where('user_id', $user->id)
+            $latestClearance = LegacyClearanceStatus::where('user_id', $user->id)
                 ->orderBy('semester_id', 'desc')
                 ->first();
 

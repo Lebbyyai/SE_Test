@@ -50,7 +50,7 @@ return new class extends Migration
             if (Schema::hasColumn('events', 'created_by')) {
                 try {
                     $table->dropForeign(['created_by']);
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                 }
             }
             foreach (['start_at', 'end_at', 'all_day', 'description', 'type', 'color', 'created_by'] as $col) {

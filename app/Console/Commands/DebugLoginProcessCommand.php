@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Http\Requests\Auth\LoginRequestV2;
 use App\Models\User;
+use App\Services\LegacyPortalClient;
 use Illuminate\Console\Command;
 
 class DebugLoginProcessCommand extends Command
@@ -80,7 +81,7 @@ class DebugLoginProcessCommand extends Command
         // Check if LegacyPortalClient is available
         $this->info('4. Checking legacy portal client...');
         try {
-            $legacyClient = app(\App\Services\LegacyPortalClient::class);
+            $legacyClient = app(LegacyPortalClient::class);
             $this->line('   ✅ LegacyPortalClient available');
         } catch (\Exception $e) {
             $this->error('   ❌ LegacyPortalClient error: '.$e->getMessage());

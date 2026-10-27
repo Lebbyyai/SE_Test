@@ -3,6 +3,7 @@
 use App\Models\DefenseRequest;
 use App\Models\Event;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 function dashboardScheduledDefense(User $student): DefenseRequest
 {
@@ -48,7 +49,7 @@ test('coordinator calendar returns their assigned defenses and excludes another 
 
 test('dashboard request feed includes the saved adviser and actual submission timestamp', function () {
     // The production query uses MySQL FIELD ordering; supply equivalent ordering in isolated SQLite tests.
-    \Illuminate\Support\Facades\DB::connection()->getPdo()->sqliteCreateFunction('FIELD', static function ($value, ...$values) {
+    DB::connection()->getPdo()->sqliteCreateFunction('FIELD', static function ($value, ...$values) {
         $index = array_search($value, $values, true);
 
         return $index === false ? 0 : $index + 1;
