@@ -84,9 +84,9 @@ class PaymentRateController extends Controller
     public function export(Request $request)
     {
         abort_unless(in_array($request->user()?->role, ['Dean', 'Coordinator', 'Administrative Assistant', 'Super Admin']), 403);
-        $validated = $request->validate(['program_level' => ['required', Rule::in(PaymentRateCsv::LEVELS)]]);
-        $level = $validated['program_level'];
-        $rates = PaymentRate::where('program_level', $level)->orderBy('type')->orderBy('defense_type')->get();
+        $validated = $request->validate(['program_level' => ['sometimes', Rule::in(PaymentRateCsv::LEVELS)]]);
+        $levels = isset($validated['program_level']) ? [$validated['program_level']] : PaymentRateCsv::LEVELS;
+        $rates = PaymentRate::whereIn('program_level', $levels)->orderBy('program_level')->orderBy('type')->orderBy('defense_type')->get();
 
         foreach ($rates as $rate) {
             if (! in_array($rate->type, PaymentRateCsv::TYPES, true) || ! in_array($rate->defense_type, PaymentRateCsv::STAGES, true)) {
@@ -95,18 +95,20 @@ class PaymentRateController extends Controller
         }
         $types = array_values(array_filter(PaymentRateCsv::TYPES, fn ($type) => $type !== 'Panel Member' || $rates->contains('type', $type)));
 
-        return response()->streamDownload(function () use ($rates, $types, $level) {
+        return response()->streamDownload(function () use ($rates, $types, $levels) {
             $handle = fopen('php://output', 'wb');
             fwrite($handle, "\xEF\xBB\xBF");
             fputcsv($handle, PaymentRateCsv::HEADER, ',', '"', '');
-            foreach ($types as $type) {
-                foreach (PaymentRateCsv::STAGES as $stage) {
-                    $rate = $rates->first(fn ($rate) => $rate->type === $type && $rate->defense_type === $stage);
-                    fputcsv($handle, [$level, $type, $stage, $rate ? number_format($rate->amount, 2, '.', '') : ''], ',', '"', '');
+            foreach ($levels as $level) {
+                foreach ($types as $type) {
+                    foreach (PaymentRateCsv::STAGES as $stage) {
+                        $rate = $rates->first(fn ($rate) => $rate->program_level === $level && $rate->type === $type && $rate->defense_type === $stage);
+                        fputcsv($handle, [$level, $type, $stage, $rate ? number_format($rate->amount, 2, '.', '') : ''], ',', '"', '');
+                    }
                 }
             }
             fclose($handle);
-        }, 'payment-rates-'.strtolower($level).'.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
+        }, 'payment-rates-'.(count($levels) === 1 ? strtolower($levels[0]) : 'all-programs').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
     }
 
     public function import(Request $request, PaymentRateCsv $csv)

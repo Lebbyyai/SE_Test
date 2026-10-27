@@ -2,7 +2,7 @@
 
 Open `/dean/payment-rates`. Export, Import and Print appear above the rate table and follow the system theme.
 
-- Select Masteral or Doctorate, then Export to download that program's CSV. Missing rates have blank amounts so a new database still gets a usable template.
+- Export downloads one CSV containing both Masteral and Doctorate, independent of the selected tab. Missing rates have blank amounts so a new database still gets a usable template.
 - Open the file in Excel, enter amounts, and save as CSV (comma delimited / UTF-8). Keep the column names `program_level,type,defense_type,amount`.
 - Files may contain both programs; each row is assigned to its program automatically and both programs are imported in one operation. Review the current and incoming values, then Apply import.
 - Blank amounts and omitted entries remain unchanged. Enter 0 explicitly to set a zero rate.

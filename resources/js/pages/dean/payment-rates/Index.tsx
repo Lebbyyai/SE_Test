@@ -322,7 +322,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                     </Tabs>
                     <div className="flex flex-wrap gap-2">
                         <Button variant="outline" asChild>
-                            <a href={`/dean/payment-rates/export?program_level=${encodeURIComponent(tab)}`}>
+                            <a href="/dean/payment-rates/export">
                                 <Download className="h-4 w-4" /> Export
                             </a>
                         </Button>
@@ -457,6 +457,13 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                             <div className="space-y-2">
                                 <p className="text-sm">
                                     Review {importRows.length} entries before saving. Existing payments keep their recorded amounts.
+                                </p>
+                                <p className="text-muted-foreground text-sm">
+                                    Detected:{' '}
+                                    {PROGRAM_LEVELS.map(
+                                        (level) => `${level}: ${importRows.filter((row) => row.program_level === level).length} rates`,
+                                    ).join(' | ')}
+                                    . Both programs will be saved together.
                                 </p>
                                 <div className="max-h-72 overflow-auto rounded-md border">
                                     <Table>

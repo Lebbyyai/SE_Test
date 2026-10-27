@@ -117,3 +117,14 @@ test('auto detection needs no program parameter and validates all programs befor
     $this->postJson('/dean/payment-rates/import', ['mode' => 'apply', 'file' => rateCsvUpload("Masteral,Adviser,Final,2000\nDoctorate,Adviser,Final,-1")])->assertUnprocessable();
     $this->assertDatabaseCount('payment_rates', 0);
 });
+
+test('default export includes both programs and imports them together without selecting a program', function () {
+    $this->actingAs(User::factory()->create(['role' => 'Dean']));
+    foreach (['Masteral' => 2000, 'Doctorate' => 1000] as $level => $amount) {
+        PaymentRate::create(['program_level' => $level, 'type' => 'Adviser', 'defense_type' => 'Final', 'amount' => $amount]);
+    }
+    $csv = $this->get('/dean/payment-rates/export')->assertOk()->streamedContent();
+    expect($csv)->toContain('Masteral,Adviser,Final,2000.00')->toContain('Doctorate,Adviser,Final,1000.00');
+    $this->postJson('/dean/payment-rates/import', ['mode' => 'preview', 'file' => UploadedFile::fake()->createWithContent('both.csv', $csv)])
+        ->assertOk()->assertJsonCount(2, 'rows')->assertJsonPath('rows.0.program_level', 'Masteral')->assertJsonPath('rows.1.program_level', 'Doctorate');
+});
