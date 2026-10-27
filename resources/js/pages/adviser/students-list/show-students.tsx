@@ -65,25 +65,6 @@ export default function ShowStudents() {
         }
     };
 
-    const acceptPending = async (s: Student) => {
-        try {
-            await axios.post(`/api/adviser/pending-students/${s.id}/accept`);
-            await loadAccepted();
-            await fetchPending();
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    const rejectPending = async (s: Student) => {
-        try {
-            await axios.post(`/api/adviser/pending-students/${s.id}/reject`);
-            await fetchPending();
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
     const lowerQuery = query.toLowerCase();
     const filteredStudents = students.filter(
         (s) =>
@@ -93,6 +74,37 @@ export default function ShowStudents() {
             (s.email?.toLowerCase().includes(lowerQuery) ?? false) ||
             (s.program?.toLowerCase().includes(lowerQuery) ?? false),
     );
+
+    const [assignmentError, setAssignmentError] = useState('');
+    const [decidingStudent, setDecidingStudent] = useState<number | null>(null);
+    const decideAssignment = async (student: Student, decision: 'accept' | 'reject') => {
+        setAssignmentError('');
+        setDecidingStudent(student.id);
+        try {
+            const token = document.cookie
+                .split(';')
+                .map((part) => part.trim())
+                .find((part) => part.startsWith('XSRF-TOKEN='));
+            await axios.post(
+                `/api/adviser/pending-students/${student.id}/${decision}`,
+                {},
+                {
+                    headers: { Accept: 'application/json', ...(token ? { 'X-XSRF-TOKEN': decodeURIComponent(token.slice(11)) } : {}) },
+                },
+            );
+            await loadAccepted();
+            await fetchPending();
+            window.dispatchEvent(new Event('notifications-updated'));
+        } catch (error) {
+            setAssignmentError(
+                axios.isAxiosError(error) && error.response?.status === 419
+                    ? 'Your session has expired. Refresh the page and try again.'
+                    : 'Unable to update the assignment. Refresh the pending list and try again.',
+            );
+        } finally {
+            setDecidingStudent(null);
+        }
+    };
 
     if (loading) {
         return (
@@ -136,7 +148,8 @@ export default function ShowStudents() {
                             variant="outline"
                             size="icon"
                             title="Accept"
-                            onClick={() => acceptPending(s)}
+                            onClick={() => decideAssignment(s, 'accept')}
+                            disabled={decidingStudent !== null}
                             className="border-green-300 text-green-600 hover:bg-green-50 hover:text-green-700"
                         >
                             <Check className="h-4 w-4" />
@@ -145,7 +158,8 @@ export default function ShowStudents() {
                             variant="outline"
                             size="icon"
                             title="Reject"
-                            onClick={() => rejectPending(s)}
+                            onClick={() => decideAssignment(s, 'reject')}
+                            disabled={decidingStudent !== null}
                             className="border-rose-300 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
                         >
                             <Trash className="h-4 w-4" />
@@ -158,6 +172,11 @@ export default function ShowStudents() {
 
     return (
         <div className="bg-background relative flex h-full flex-1 flex-col gap-4 overflow-auto rounded-xl pt-5 pr-7 pl-7 transition-colors dark:bg-zinc-900">
+            {assignmentError && (
+                <p role="alert" className="text-destructive rounded-lg border p-3 text-sm">
+                    {assignmentError}
+                </p>
+            )}
             {/* Header - two rows: title row, then search row */}
             <div className="border-border mb-1 w-full overflow-hidden rounded-lg border bg-white dark:border-zinc-700 dark:bg-zinc-900">
                 {/* Title row */}

@@ -468,6 +468,7 @@ class CoordinatorAdviserController extends Controller
         $validated = $request->validate([
             'student_id' => 'nullable|integer|exists:users,id',
             'email' => 'nullable|email',
+            'send_email' => 'sometimes|boolean',
         ]);
 
         $student = null;
@@ -501,9 +502,12 @@ class CoordinatorAdviserController extends Controller
             ],
         ]);
 
-        // Send email notification to adviser about the new student assignment
+        $pendingStudent = $adviserUser->advisedStudents()->whereKey($student->id)->firstOrFail();
+        app(\App\Services\AdviserAssignmentNotifications::class)->pending($adviserUser, $student, (string) $pendingStudent->pivot->updated_at);
+
+        // In-app notifications are always created; email is optional.
         try {
-            if ($adviserUser->email) {
+            if ($request->boolean('send_email') && $adviserUser->email) {
                 Mail::to($adviserUser->email)
                     ->send(new \App\Mail\StudentAssignedToAdviser($adviserUser, $student, $coordinator));
 

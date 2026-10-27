@@ -226,7 +226,8 @@ export default function ShowAdvisers() {
         }
     }, [viewAdviser]);
 
-    const handleAddStudent = async () => {
+    const [assignmentEmailOpen, setAssignmentEmailOpen] = useState(false);
+    const handleAddStudent = async (sendEmail: boolean) => {
         if (!studentEmail.trim() || !viewAdviser) return;
         setAddingStudent(true);
         setAddStudentError('');
@@ -239,6 +240,7 @@ export default function ShowAdvisers() {
                 `/api/coordinator/advisers/${viewAdviser.id}/students`,
                 {
                     email: studentEmail.trim(),
+                    send_email: sendEmail,
                 },
                 {
                     headers: {
@@ -250,6 +252,8 @@ export default function ShowAdvisers() {
             // refresh pending list in the open view so coordinator sees it immediately
             await fetchPendingStudents(viewAdviser.id);
             await fetchStudents(viewAdviser.id);
+            setAssignmentEmailOpen(false);
+            setAdviserTab('pending');
             setAddStudentDialogOpen(false);
             setStudentEmail('');
         } catch (err: unknown) {
@@ -837,9 +841,41 @@ export default function ShowAdvisers() {
                         />
                     </div>
                     <DialogFooter>
-                        <Button onClick={handleAddStudent} disabled={!studentEmail.trim() || addingStudent}>
+                        <Button onClick={() => setAssignmentEmailOpen(true)} disabled={!studentEmail.trim() || addingStudent}>
                             {addingStudent ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                             Add Student
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={assignmentEmailOpen} onOpenChange={setAssignmentEmailOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Send Assignment Notification?</DialogTitle>
+                        <DialogDescription>
+                            In-app notifications will be sent to the student and adviser. Would you also like to email the adviser?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="bg-muted rounded-lg p-4 text-sm">
+                        <p className="font-semibold">
+                            {viewAdviser?.first_name} {viewAdviser?.last_name}
+                        </p>
+                        <p>{viewAdviser?.email}</p>
+                        <p className="mt-2">Student: {studentEmail}</p>
+                        <p className="mt-2">The assignment remains pending until the adviser accepts.</p>
+                    </div>
+                    {addStudentError && (
+                        <p role="alert" className="text-destructive text-sm">
+                            {addStudentError}
+                        </p>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" disabled={addingStudent} onClick={() => handleAddStudent(false)}>
+                            Skip Email
+                        </Button>
+                        <Button disabled={addingStudent} onClick={() => handleAddStudent(true)}>
+                            {addingStudent ? 'Assigning...' : 'Send Email'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

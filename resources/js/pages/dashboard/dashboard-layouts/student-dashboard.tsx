@@ -1,7 +1,7 @@
 import { Card } from '@/components/ui/card';
 import type { DefenseRequest } from '@/types';
 import type { DefenseOverview } from '@/types/workflows';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { AlertCircle, BadgeDollarSign, CalendarDays, ClipboardList, Moon, Sun, Users } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import DefenseStatusWidget from '../widgets/defense-status-widget';
@@ -28,7 +28,8 @@ type PageProps = {
             name: string;
             role: string;
             school_id?: string;
-            advisers?: unknown[]; // Add advisers property, adjust type if needed
+            advisers?: { id: number; first_name: string; last_name: string; email: string }[];
+            pendingAdvisers?: { id: number; first_name: string; last_name: string; email: string }[];
         } | null;
     };
     defenseRequirement?: DefenseRequirement;
@@ -57,6 +58,19 @@ export default function StudentDashboard() {
         auth: { user },
     } = page;
     const serverDefenseRequests = page.defenseRequests ?? [];
+    const pendingAdviser = user?.pendingAdvisers?.[0];
+    const acceptedAdviser = user?.advisers?.[0];
+    useEffect(() => {
+        const refresh = () => {
+            if (document.visibilityState === 'visible') router.reload({ only: ['auth'] });
+        };
+        const timer = window.setInterval(refresh, 30000);
+        window.addEventListener('focus', refresh);
+        return () => {
+            window.clearInterval(timer);
+            window.removeEventListener('focus', refresh);
+        };
+    }, []);
 
     const [allRequests, setAllRequests] = useState<DefenseOverview[]>([]);
     const [,] = useState<DefenseOverview[]>([]);
@@ -185,7 +199,24 @@ export default function StudentDashboard() {
                     </div>
 
                     {/* ALERT: Student has not registered an adviser - Mobile Responsive */}
-                    {user?.advisers?.length === 0 && showAdviserAlert && (
+                    {(pendingAdviser || acceptedAdviser) && (
+                        <div role="status" className="bg-card mx-4 my-3 rounded-xl border px-6 py-5 md:mx-7">
+                            <p className="font-semibold">
+                                {pendingAdviser ? 'Adviser assignment awaiting confirmation' : 'Your adviser connection is active'}
+                            </p>
+                            <p className="text-muted-foreground mt-1 text-sm">
+                                {(pendingAdviser ?? acceptedAdviser)?.first_name} {(pendingAdviser ?? acceptedAdviser)?.last_name} &middot;{' '}
+                                {(pendingAdviser ?? acceptedAdviser)?.email}
+                            </p>
+                            {pendingAdviser && (
+                                <p className="text-muted-foreground mt-2 text-sm">
+                                    Your coordinator has assigned your adviser. They must accept the assignment before the connection becomes active.
+                                    You will receive a notification when they respond.
+                                </p>
+                            )}
+                        </div>
+                    )}
+                    {!pendingAdviser && user?.advisers?.length === 0 && showAdviserAlert && (
                         <div className="mx-4 my-3 md:mx-7">
                             <div className="relative flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 text-rose-900 md:gap-3 md:px-6 md:py-5 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100">
                                 <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-rose-500 md:mt-1 md:h-5 md:w-5 dark:text-rose-400" />

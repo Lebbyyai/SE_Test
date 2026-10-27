@@ -88,11 +88,13 @@ class AdviserStudentController extends Controller
     {
         $adviser = $request->user();
 
-        if (! $adviser->advisedStudents()->wherePivot('student_id', $studentId)->exists()) {
+        if (! $adviser->advisedStudents()->wherePivot('student_id', $studentId)->wherePivot('status', 'pending')->exists()) {
             return response()->json(['error' => 'Pending assignment not found.'], 404);
         }
 
+        $pendingStudent = $adviser->advisedStudents()->whereKey($studentId)->firstOrFail();
         $adviser->advisedStudents()->updateExistingPivot($studentId, ['status' => 'accepted']);
+        app(\App\Services\AdviserAssignmentNotifications::class)->decided($adviser, $pendingStudent, 'accepted', $pendingStudent->pivot->requested_by);
 
         // Send welcome email to student
         try {
@@ -125,12 +127,14 @@ class AdviserStudentController extends Controller
     {
         $adviser = $request->user();
 
-        if (! $adviser->advisedStudents()->wherePivot('student_id', $studentId)->exists()) {
+        if (! $adviser->advisedStudents()->wherePivot('student_id', $studentId)->wherePivot('status', 'pending')->exists()) {
             return response()->json(['error' => 'Pending assignment not found.'], 404);
         }
 
         // Mark as rejected (do NOT delete)
+        $pendingStudent = $adviser->advisedStudents()->whereKey($studentId)->firstOrFail();
         $adviser->advisedStudents()->updateExistingPivot($studentId, ['status' => 'rejected']);
+        app(\App\Services\AdviserAssignmentNotifications::class)->decided($adviser, $pendingStudent, 'rejected', $pendingStudent->pivot->requested_by);
 
         // Send rejection email to student
         try {

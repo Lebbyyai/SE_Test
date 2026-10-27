@@ -190,6 +190,7 @@ class DashboardController extends Controller
                     'role' => $effective,
                     'school_id' => $user->school_id,
                     'avatar' => $user->employee_photo_url ?? null,
+                    'pendingAdvisers' => $user->advisers()->wherePivot('status', 'pending')->get(['users.id', 'users.first_name', 'users.last_name', 'users.email']),
                     // Show only accepted advisers
                     'advisers' => method_exists($user, 'advisers')
                         ? $user->advisers()
