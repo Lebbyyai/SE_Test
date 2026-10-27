@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import DefenseStatusWidget from '../widgets/defense-status-widget';
 import ExamEligibilityWidget from '../widgets/exam-eligibility-widget';
 import QuickActionsWidget from '../widgets/quick-actions-widget';
-import WeeklyDefenseSchedulesWidget from '../widgets/weekly-defense-schedule-widget';
+import StudentSchedulesWidget from '../widgets/student-schedules-widget';
 
 type DefenseRequirement = {
     id: number;
@@ -60,22 +60,10 @@ export default function StudentDashboard() {
 
     const [allRequests, setAllRequests] = useState<DefenseOverview[]>([]);
     const [,] = useState<DefenseOverview[]>([]);
-    const [todayEvents] = useState<DefenseOverview[]>([]);
+    const [todayEventCount, setTodayEventCount] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [,] = useState(true);
     const [showAdviserAlert, setShowAdviserAlert] = useState(true);
-
-    const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
-
-    const weekDays = [
-        { label: 'Sun', value: 0 },
-        { label: 'Mon', value: 1 },
-        { label: 'Tue', value: 2 },
-        { label: 'Wed', value: 3 },
-        { label: 'Thu', value: 4 },
-        { label: 'Fri', value: 5 },
-        { label: 'Sat', value: 6 },
-    ];
 
     useEffect(() => {
         const hydrate = (requests: DefenseOverview[]) => {
@@ -125,7 +113,7 @@ export default function StudentDashboard() {
         },
         {
             title: "Today's Schedules",
-            value: todayEvents.length,
+            value: todayEventCount === null ? 'Checking...' : todayEventCount,
             description: 'Events scheduled for today',
             icon: <CalendarDays />,
             iconTheme: 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300',
@@ -145,22 +133,6 @@ export default function StudentDashboard() {
             iconTheme: 'bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300',
         },
     ];
-
-    // For horizontal scroll
-    const [scrollRef] = useState<HTMLDivElement | null>(null);
-    const [, setCanScrollLeft] = useState(false);
-    const [, setCanScrollRight] = useState(true);
-
-    useEffect(() => {
-        if (!scrollRef) return;
-        const updateScroll = () => {
-            setCanScrollLeft(scrollRef.scrollLeft > 0);
-            setCanScrollRight(scrollRef.scrollLeft + scrollRef.clientWidth < scrollRef.scrollWidth - 5);
-        };
-        scrollRef.addEventListener('scroll', updateScroll);
-        updateScroll();
-        return () => scrollRef.removeEventListener('scroll', updateScroll);
-    }, [scrollRef]);
 
     return (
         <div className="dark:bg-background flex h-full flex-1 flex-col gap-4 overflow-auto bg-white">
@@ -272,19 +244,10 @@ export default function StudentDashboard() {
                     <div className="dark:bg-muted mx-2 mt-2 mb-2 flex flex-col gap-4 rounded-lg bg-gray-100 px-3 py-4 md:mx-4 md:gap-6 md:rounded-xl md:px-5 md:py-8">
                         <div className="mb-2 flex w-full flex-col gap-4">
                             {/* Schedules first */}
-                            <WeeklyDefenseSchedulesWidget
-                                weekDays={weekDays}
-                                selectedDay={selectedDay}
-                                setSelectedDay={setSelectedDay}
-                                approvedDefenses={approvedDefenses as DefenseRequest[]}
-                                referenceDate={new Date()}
-                                loading={loading}
-                                studentId={user?.id}
-                            />
+                            <StudentSchedulesWidget onTodayCount={setTodayEventCount} />
                             {/* Defense Status Widget beside the schedule widget on desktop, below on mobile */}
                             <DefenseStatusWidget recentRequests={approvedDefenses} loading={loading} />
                         </div>
-                        <div className="grid gap-4 md:grid-cols-2">{/*put here your other widgets if you create one please*/}</div>
                     </div>
                 </>
             )}
