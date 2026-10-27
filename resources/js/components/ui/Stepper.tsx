@@ -86,7 +86,7 @@ export function Stepper({
       </div>
 
       {/* nav buttons */}
-      <div className="sticky bottom-0 bg-white pt-4 pb-2 px-3 flex justify-end gap-2 border-t border-gray-200">
+      <div className="sticky bottom-0 bg-background text-foreground pt-4 pb-2 px-3 flex justify-end gap-2 border-t border-border">
         <Button variant="ghost" onClick={onPrev} disabled={currentStep === 0 || loading}>
           Previous
         </Button>
