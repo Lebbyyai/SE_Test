@@ -22,6 +22,8 @@ class StudentDocumentController extends Controller
             'rec_endorsement' => 'REC Endorsement',
             'proof_of_payment' => 'Proof of Payment',
             'avisee_adviser_attachment' => 'Avisee-Adviser Attachment',
+            'ai_detection_certificate' => 'AI Detection Certificate',
+            'endorsement_form' => 'Endorsement Form',
         ];
 
         $files = [];
@@ -29,9 +31,10 @@ class StudentDocumentController extends Controller
             foreach ($fileFields as $field => $label) {
                 $path = $req->$field;
                 if ($path) {
-                    $fullPath = "public/{$path}";
-                    $exists = Storage::exists($fullPath);
-                    $size = $exists ? Storage::size($fullPath) : null;
+                    $path = ltrim(preg_replace('#^/?storage/#', '', $path), '/');
+                    $disk = Storage::disk('public');
+                    $exists = $disk->exists($path);
+                    $size = $exists ? $disk->size($path) : null;
                     $files[] = [
                         'id' => $req->id,
                         'defense_title' => $req->thesis_title,
@@ -40,7 +43,7 @@ class StudentDocumentController extends Controller
                         'label' => $label,
                         'filename' => basename($path),
                         'path' => $path,
-                        'url' => Storage::url($path),
+                        'url' => $disk->url($path),
                         'size' => $size,
                         'submitted_at' => $req->created_at?->toIso8601String(),
                     ];

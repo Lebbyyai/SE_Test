@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { csrfHeaders } from '@/lib/csrf';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -81,15 +82,11 @@ export function DocumentGeneratorDialog({ open, onOpenChange, defenseRequest, tr
         try {
             const res = await fetch('/api/generate-document', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
-                },
+                headers: csrfHeaders(true),
                 body: JSON.stringify({
                     template_id: selectedTemplateId,
                     defense_request_id: defenseRequest?.id,
-                    fields: fieldValues,
+                    fields: Object.fromEntries(Object.entries(fieldValues).filter(([, value]) => value.trim() !== '')),
                 }),
             });
             const data = await res.json();

@@ -8,7 +8,7 @@ type NavItem = { title: string; href: string; roles?: string[] };
 
 const baseNav: NavItem[] = [
     { title: 'Profile', href: '/settings/profile' },
-    { title: 'General', href: '/settings/general', roles: ['Coordinator'] },
+    { title: 'General', href: '/settings/general', roles: ['Coordinator', 'Adviser'] },
     { title: 'Password', href: '/settings/password' },
     { title: 'Appearance', href: '/settings/appearance' },
 ];

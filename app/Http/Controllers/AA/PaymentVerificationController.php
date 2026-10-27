@@ -6,86 +6,136 @@ use App\Http\Controllers\Controller;
 use App\Models\AaPaymentBatch;
 use App\Models\AaPaymentVerification;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class PaymentVerificationController extends Controller
 {
-    // List all verifications assigned to the current AA
+    private function authorizeStaff(): void
+    {
+        abort_unless(in_array(auth()->user()?->role, ['Administrative Assistant', 'Dean', 'Super Admin'], true), 403);
+    }
+
+    private function authorizeVerification(AaPaymentVerification $verification): void
+    {
+        if (auth()->user()->role === 'Administrative Assistant') {
+            abort_if($verification->assigned_to && (int) $verification->assigned_to !== (int) auth()->id(), 403);
+        }
+    }
+
+    private function validatedSelection(Request $request): array
+    {
+        return $request->validate([
+            'verification_ids' => 'required|array|min:1',
+            'verification_ids.*' => 'required|integer|distinct|exists:aa_payment_verifications,id',
+        ])['verification_ids'];
+    }
+
     public function index()
     {
-        $verifications = AaPaymentVerification::with('defenseRequest')
-            ->where('assigned_to', Auth::id())
-            ->get();
+        $this->authorizeStaff();
+        $verifications = AaPaymentVerification::with('defenseRequest')->latest();
+        $batches = AaPaymentBatch::latest();
+        if (auth()->user()->role === 'Administrative Assistant') {
+            $verifications->where(fn ($q) => $q->whereNull('assigned_to')->orWhere('assigned_to', auth()->id()));
+            $batches->where('created_by', auth()->id());
+        }
 
-        return view('administrative-assistant.payment-verification', compact('verifications'));
+        return Inertia::render('assistant/payment-verifications/Index', [
+            'verifications' => $verifications->get(),
+            'batches' => $batches->get(['id', 'name', 'status']),
+        ]);
     }
 
-    // Update status (verify/reject)
     public function updateStatus(Request $request, $id)
     {
-        $request->validate([
-            'status' => 'required|in:pending,verified,rejected',
-            'remarks' => 'nullable|string',
-        ]);
+        $this->authorizeStaff();
+        $data = $request->validate(['status' => 'required|in:pending,verified,rejected', 'remarks' => 'nullable|string|max:5000']);
 
-        $verification = AaPaymentVerification::findOrFail($id);
+        return DB::transaction(function () use ($data, $id) {
+            $verification = AaPaymentVerification::lockForUpdate()->findOrFail($id);
+            $this->authorizeVerification($verification);
+            $verification->fill($data);
+            if (! $verification->assigned_to && auth()->user()->role === 'Administrative Assistant') {
+                $verification->assigned_to = auth()->id();
+            }
+            $verification->save();
 
-        // Only allow the assigned AA to update
-        if ($verification->assigned_to && $verification->assigned_to != Auth::id()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        $verification->status = $request->input('status');
-        $verification->remarks = $request->input('remarks');
-        $verification->save();
-
-        return response()->json(['success' => true, 'status' => $verification->status]);
+            return response()->json(['success' => true, 'status' => $verification->status]);
+        });
     }
 
-    // Add to batch
     public function addToBatch(Request $request)
     {
-        $batch = AaPaymentBatch::create([
-            'name' => $request->input('name'),
-            'created_by' => Auth::id(),
-            'status' => 'pending',
-        ]);
+        $this->authorizeStaff();
+        $data = $request->validate(['name' => 'required|string|max:120']);
+        $ids = $this->validatedSelection($request);
+        $batch = DB::transaction(function () use ($ids, $data) {
+            $rows = AaPaymentVerification::whereIn('id', $ids)->lockForUpdate()->get();
+            foreach ($rows as $row) {
+                $this->authorizeVerification($row);
+                abort_if($row->batch_id, 422, 'A selected verification already belongs to a batch.');
+            }
+            $batch = AaPaymentBatch::create(['name' => $data['name'], 'created_by' => auth()->id(), 'status' => 'pending']);
+            foreach ($rows as $row) {
+                $row->batch_id = $batch->id;
+                if (! $row->assigned_to && auth()->user()->role === 'Administrative Assistant') {
+                    $row->assigned_to = auth()->id();
+                }
+                $row->save();
+            }
 
-        AaPaymentVerification::whereIn('id', $request->input('verification_ids', []))
-            ->update(['batch_id' => $batch->id]);
+            return $batch;
+        });
 
-        return back()->with('success', 'Batch created and requests added.');
+        return $request->expectsJson() ? response()->json(['success' => true, 'batch' => $batch], 201) : back()->with('success', 'Batch created and requests added.');
     }
 
-    // Export batch to CSV
     public function exportBatch($batchId)
     {
-        $batch = AaPaymentBatch::with('verifications.defenseRequest')->findOrFail($batchId);
-
-        $csv = "ID,Defense Request,Status,Remarks\n";
-        foreach ($batch->verifications as $v) {
-            $csv .= "{$v->id},{$v->defenseRequest->id},{$v->status},\"{$v->remarks}\"\n";
+        $this->authorizeStaff();
+        $batch = AaPaymentBatch::with('verifications')->findOrFail($batchId);
+        if (auth()->user()->role === 'Administrative Assistant') {
+            abort_unless((int) $batch->created_by === (int) auth()->id(), 403);
+        }
+        foreach ($batch->verifications as $row) {
+            $this->authorizeVerification($row);
         }
 
-        return Response::make($csv, 200, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=batch_{$batch->id}.csv",
-        ]);
+        return response()->streamDownload(function () use ($batch) {
+            $stream = fopen('php://output', 'w');
+            fputcsv($stream, ['ID', 'Defense Request', 'Status', 'Remarks'], ',', '"', '');
+            foreach ($batch->verifications as $row) {
+                $remarks = (string) $row->remarks;
+                if (preg_match('/^[\\s]*[=+@-]|^[\\t\\r\\n]/', $remarks)) {
+                    $remarks = "'".$remarks;
+                }
+                fputcsv($stream, [$row->id, $row->defense_request_id, $row->status, $remarks], ',', '"', '');
+            }
+            fclose($stream);
+        }, 'batch_'.$batch->id.'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
-    // Bulk update status
     public function bulkUpdateStatus(Request $request)
     {
-        $request->validate([
-            'verification_ids' => 'required|array',
-            'verification_ids.*' => 'integer|exists:aa_payment_verifications,id',
-            'status' => 'required|in:pending,verified,rejected',
-        ]);
+        $this->authorizeStaff();
+        $data = $request->validate(['status' => 'required|in:pending,verified,rejected']);
+        $ids = $this->validatedSelection($request);
 
-        $updated = AaPaymentVerification::whereIn('id', $request->verification_ids)
-            ->update(['status' => $request->status]);
+        return DB::transaction(function () use ($ids, $data) {
+            $rows = AaPaymentVerification::whereIn('id', $ids)->lockForUpdate()->get();
+            foreach ($rows as $row) {
+                $this->authorizeVerification($row);
+            }
+            foreach ($rows as $row) {
+                $row->status = $data['status'];
+                if (! $row->assigned_to && auth()->user()->role === 'Administrative Assistant') {
+                    $row->assigned_to = auth()->id();
+                }
+                $row->save();
+            }
 
-        return response()->json(['success' => true, 'updated_count' => $updated]);
+            return response()->json(['success' => true, 'updated_count' => $rows->count()]);
+        });
     }
 }

@@ -1,9 +1,38 @@
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { csrfHeaders } from '@/lib/csrf';
+import { router } from '@inertiajs/react';
 import { CheckCircle2, ClipboardList, GraduationCap, Mail, User2, XCircle } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import type { CompreExamApplicationSummary } from './Index';
 
 export default function Details({ application }: { application: CompreExamApplicationSummary }) {
     const elig = application.eligible;
+    const [status, setStatus] = useState(application.application_status);
+    const [remarks, setRemarks] = useState(application.review_remarks ?? '');
+    const [saving, setSaving] = useState(false);
+    async function review(decision: 'approved' | 'rejected') {
+        if (!window.confirm(`Confirm that this application should be ${decision}?`)) return;
+        setSaving(true);
+        try {
+            const response = await fetch(`/coordinator/compre-exam/${application.application_id}/review`, {
+                method: 'POST',
+                headers: csrfHeaders(true),
+                body: JSON.stringify({ decision, remarks: remarks.trim() || null }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Unable to review this application.');
+            setStatus(decision);
+            toast.success(`Application ${decision}.`);
+            router.reload({ only: ['eligible', 'notEligible', 'counts'] });
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Unable to connect. Please try again.');
+        } finally {
+            setSaving(false);
+        }
+    }
 
     const statusBadge = (v: CompreExamApplicationSummary['application_status']) => {
         const s = v || 'not_yet_applied';
@@ -103,7 +132,7 @@ export default function Details({ application }: { application: CompreExamApplic
                             </Badge>
 
                             {/* Application Status */}
-                            {statusBadge(application.application_status)}
+                            {statusBadge(status)}
 
                             {/* Permit Status */}
                             {permitBadge(application.permit_status)}
@@ -112,6 +141,26 @@ export default function Details({ application }: { application: CompreExamApplic
                 </div>
             </div>
 
+            {application.application_id && status === 'pending' && (
+                <section className="mt-5 space-y-3 border-t pt-4">
+                    <h3 className="font-semibold">Review application</h3>
+                    <Input
+                        aria-label="Application review remarks"
+                        placeholder="Review remarks (required when rejecting)"
+                        value={remarks}
+                        onChange={(event) => setRemarks(event.target.value)}
+                        maxLength={2000}
+                    />
+                    <div className="flex gap-3">
+                        <Button disabled={saving} onClick={() => review('approved')}>
+                            Approve application
+                        </Button>
+                        <Button variant="outline" disabled={saving || remarks.trim().length < 3} onClick={() => review('rejected')}>
+                            Reject application
+                        </Button>
+                    </div>
+                </section>
+            )}
             {/* Lacking requirements */}
             <div className="mt-4">
                 <div className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">Lacking requirements</div>

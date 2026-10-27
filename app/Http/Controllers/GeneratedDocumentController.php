@@ -16,6 +16,10 @@ class GeneratedDocumentController extends Controller
         $this->authorizeRequest($doc->defenseRequest);
         abort_unless(Storage::disk('public')->exists($doc->output_path), 404);
 
+        if (request()->boolean('inline')) {
+            return Storage::disk('public')->response($doc->output_path, basename($doc->output_path), ['Content-Type' => 'application/pdf', 'X-Content-Type-Options' => 'nosniff'], 'inline');
+        }
+
         return Storage::disk('public')->download($doc->output_path);
     }
 
@@ -47,6 +51,7 @@ class GeneratedDocumentController extends Controller
             'template_id' => 'required|integer|exists:document_templates,id',
             'defense_request_id' => 'required|integer|exists:defense_requests,id',
             'fields' => 'array',
+            'fields.*' => 'nullable|string|max:5000',
         ]);
 
         $tpl = DocumentTemplate::findOrFail($request->template_id);
@@ -56,9 +61,11 @@ class GeneratedDocumentController extends Controller
         $generator = new DocumentGenerator;
         $generated = $generator->generate($tpl, $defenseRequest, $request->fields ?? []);
 
-        $pdfPath = storage_path('app/public/'.$generated->output_path);
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'download_url' => route('generated-documents.show', ['doc' => $generated->id, 'inline' => 1])]);
+        }
 
-        return response()->download($pdfPath, 'endorsement_form.pdf')->deleteFileAfterSend(false);
+        return Storage::disk('public')->download($generated->output_path, 'endorsement_form.pdf', ['Content-Type' => 'application/pdf']);
     }
 
     private function authorizeRequest(DefenseRequest $defenseRequest, bool $generate = false): void

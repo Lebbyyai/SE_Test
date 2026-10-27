@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ExamApplication;
+use App\Models\Notification;
+use App\Models\User;
+use App\Services\ExamReviewAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -13,13 +17,10 @@ class CoordinatorCompreExamController extends Controller
     {
         $user = $request->user();
 
-        if (method_exists($user, 'isCoordinator') && ! $user->isCoordinator()) {
-            abort(403, 'Only coordinators can access this page.');
-        }
+        $access = app(ExamReviewAccess::class);
+        $programs = $access->programs($user);
 
-        $programs = method_exists($user, 'allowedProgramNames') ? $user->allowedProgramNames() : [];
-
-        if (empty($programs)) {
+        if (empty($programs) && $user->role !== 'Administrative Assistant') {
             return Inertia::render('coordinator/compre-exam/Index', [
                 'programs' => [],
                 'eligible' => [],
@@ -41,7 +42,7 @@ class CoordinatorCompreExamController extends Controller
 
         $students = DB::table('users as u')
             ->select('u.id', 'u.first_name', 'u.middle_name', 'u.last_name', 'u.email', 'u.program', 'u.school_id')
-            ->whereIn('u.program', $programs)
+            ->when($user->role !== 'Administrative Assistant', fn ($query) => $query->whereIn('u.program', $programs))
             // Only real students
             ->when($useRoleString, function ($q) {
                 $q->whereIn(DB::raw('LOWER(u.role)'), ['student']);
@@ -70,7 +71,7 @@ class CoordinatorCompreExamController extends Controller
             $latest = null;
             if ($hasExamApp) {
                 $latest = DB::table('exam_application')
-                    ->where('student_id', $sid)
+                    ->whereIn('student_id', array_filter([$sid, $s->id], fn ($id) => filled($id)))
                     ->orderByDesc($orderCol)
                     ->first();
             }
@@ -79,6 +80,9 @@ class CoordinatorCompreExamController extends Controller
 
             return [
                 'id' => (int) $s->id,
+                'application_id' => $latest ? (int) $latest->application_id : null,
+                'review_remarks' => $latest->review_remarks ?? null,
+                'reviewed_at' => $latest->reviewed_at ?? null,
                 'first_name' => $s->first_name ?? '',
                 'middle_name' => $s->middle_name ?? null,
                 'last_name' => $s->last_name ?? '',
@@ -109,10 +113,44 @@ class CoordinatorCompreExamController extends Controller
         ]);
     }
 
+    public function review(Request $request, ExamApplication $application)
+    {
+        $user = $request->user();
+        $access = app(ExamReviewAccess::class);
+        $access->authorize($user);
+        $data = $request->validate(['decision' => 'required|in:approved,rejected', 'remarks' => 'nullable|required_if:decision,rejected|string|min:3|max:2000']);
+
+        return DB::transaction(function () use ($application, $user, $access, $data) {
+            $application = ExamApplication::whereKey($application->getKey())->lockForUpdate()->firstOrFail();
+            $student = User::where('role', 'Student')->where('school_id', (string) $application->student_id)->first();
+            if (! $student && ctype_digit((string) $application->student_id)) {
+                $student = User::where('role', 'Student')->find((int) $application->student_id);
+            }
+            abort_unless($student, 404, 'The student account was not found.');
+            if ($user->role !== 'Administrative Assistant') {
+                abort_unless(in_array($student->program, $access->programs($user), true), 403);
+            }
+            abort_unless(strtolower($application->final_approval_status ?? 'pending') === 'pending', 409, 'This application has already been reviewed.');
+            $application->update([
+                'final_approval_status' => $data['decision'], 'final_approval_DATE' => now(),
+                'approved_by' => $data['decision'] === 'approved' ? $user->id : null,
+                'reviewed_by' => $user->id, 'reviewed_at' => now(), 'review_remarks' => $data['remarks'] ?? null,
+            ]);
+            Notification::create([
+                'user_id' => $student->id, 'type' => 'comprehensive-exam-reviewed',
+                'title' => 'Comprehensive exam application '.$data['decision'],
+                'message' => $user->display_name.' '.$data['decision'].' your comprehensive exam application.'.(! empty($data['remarks']) ? ' '.$data['remarks'] : ''),
+                'link' => '/comprehensive-exam', 'read' => false,
+            ]);
+
+            return response()->json(['ok' => true, 'status' => $data['decision']]);
+        });
+    }
+
     // Simulation-friendly eligibility (set COMPRE_BYPASS_RULES=true in .env for local dev)
     protected function computeEligibility($studentId): array
     {
-        $devBypass = app()->environment('local') && (bool) env('COMPRE_BYPASS_RULES', true);
+        $devBypass = app()->environment('local') && (bool) env('COMPRE_BYPASS_RULES', false);
         if ($devBypass) {
             return ['eligible' => true, 'lacking' => []];
         }

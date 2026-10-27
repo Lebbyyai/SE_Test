@@ -9,6 +9,7 @@ use App\Mail\DefenseRequestRejected;
 use App\Mail\DefenseRequestSubmitted;
 use App\Models\AaPaymentVerification;
 use App\Models\DefenseRequest;
+use App\Models\GeneratedDocument;
 use App\Models\HonorariumDisbursement;
 use App\Models\Notification;
 use App\Models\Panelist;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class DefenseRequestController extends Controller
@@ -43,6 +45,9 @@ class DefenseRequestController extends Controller
         if (in_array($user->role, $coordinatorRoles)) {
             // Coordinator view: show queue of adviser-approved onward
             $query = DefenseRequest::query();
+            if ($user->role === 'Coordinator') {
+                $query->where('coordinator_user_id', $user->id);
+            }
 
             // --- AA filter ---
             if ($user->role === 'Administrative Assistant') {
@@ -1403,8 +1408,12 @@ class DefenseRequestController extends Controller
 
         $query = DefenseRequest::query();
 
-        // Only show requests assigned to this coordinator (for all coordinator roles)
-        $query->where('coordinator_user_id', $user->id);
+        if ($user->role === 'Coordinator') {
+            $query->where('coordinator_user_id', $user->id);
+        }
+        if ($user->role === 'Administrative Assistant') {
+            $query->where('coordinator_status', 'Approved');
+        }
 
         // Only show requests in states relevant to the coordinator
         $query->whereIn('workflow_state', [
@@ -1677,5 +1686,21 @@ class DefenseRequestController extends Controller
         abort_unless($disk->exists($path), 404);
 
         return $disk->download($path);
+    }
+
+    public function attachEndorsement(Request $request, DefenseRequest $defenseRequest)
+    {
+        abort_unless($request->user(), 401);
+        abort_unless($request->user()->role === 'Adviser' && (int) $defenseRequest->adviser_user_id === (int) $request->user()->id, 403);
+        $data = $request->validate(['url' => 'required|string|max:2048']);
+        $urlPath = parse_url($data['url'], PHP_URL_PATH);
+        $relative = is_string($urlPath) ? ltrim(preg_replace('#^/storage/#', '', $urlPath), '/') : '';
+        $document = GeneratedDocument::where('defense_request_id', $defenseRequest->id)->where('output_path', $relative)->first();
+        if (! $document || ! Storage::disk('public')->exists($relative)) {
+            throw ValidationException::withMessages(['url' => 'Select a document generated for this defense request.']);
+        }
+        $defenseRequest->update(['endorsement_form' => $relative]);
+
+        return response()->json(['ok' => true]);
     }
 }

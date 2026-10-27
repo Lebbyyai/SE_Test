@@ -8,6 +8,8 @@ Follow [the groupmate setup guide](docs/groupmate-setup.md) to clone this reposi
 
 ## Running an installation that is already configured
 
+The [October 28 feature audit](docs/full-feature-audit-2026-10-28.md) adds AA exam application and receipt review, repairs document and role-access defects, and records verification and remaining client checks. After pulling, run `npm ci` and `php artisan migrate`, then restart the development process.
+
 The October 25 automated-check and runtime fixes are described in [the verification report](docs/check-fixes-2026-10-25.md).
 
 The new [Defense Register](docs/defense-register-2026-10-26.md) provides schedule exports, internal/external panel classification, and actual service confirmation before honorarium preparation. Run `php artisan migrate` after updating.

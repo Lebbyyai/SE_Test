@@ -25,12 +25,12 @@ class AuditDiagramPages extends Command
         }
 
         $pages = [
-            'student@uic.edu.ph' => ['/dashboard', '/defense-requirements', '/comprehensive-exam', '/schedule'],
-            'adviser@uic.edu.ph' => ['/dashboard', '/all-defense-requirements', '/adviser/students-list', '/honorarium-ledger'],
-            'acadcoor@uic.edu.ph' => ['/dashboard', '/coordinator/defense-requests', '/coordinator/defense-management', '/coordinator/adviser-list', '/coordinator/compre-exam', '/honorarium-workspace', '/panelists', '/schedule'],
-            'aa@uic.edu.ph' => ['/dashboard', '/assistant/all-defense-list', '/honorarium-summary', '/honorarium-workspace', '/honorarium-documents', '/honorarium-ledger'],
-            'finance@uic.edu.ph' => ['/dashboard', '/honorarium-workspace', '/honorarium-documents'],
-            'dean@uic.edu.ph' => ['/dashboard', '/dean/payment-rates', '/settings/documents'],
+            'student@uic.edu.ph' => ['/dashboard', '/defense-requirements', '/comprehensive-exam', '/schedule', '/payment', '/student/documents', '/academic-records', '/settings/profile', '/settings/password', '/settings/appearance', '/settings/signatures'],
+            'adviser@uic.edu.ph' => ['/dashboard', '/all-defense-requirements', '/adviser/students-list', '/honorarium-ledger', '/schedules', '/honorarium-workspace', '/defense-register', '/settings/general', '/settings/signatures', '/api/adviser/students', '/api/adviser/pending-students'],
+            'acadcoor@uic.edu.ph' => ['/dashboard', '/coordinator/defense-requests', '/coordinator/defense-management', '/coordinator/adviser-list', '/coordinator/compre-exam', '/honorarium-workspace', '/panelists', '/schedule', '/coordinator/compre-payment', '/coordinator/schedule/calendar', '/student-records', '/dean/payment-rates', '/defense-register', '/settings/general', '/settings/signatures'],
+            'aa@uic.edu.ph' => ['/dashboard', '/assistant/all-defense-list', '/honorarium-summary', '/honorarium-workspace', '/honorarium-documents', '/honorarium-ledger', '/aa/payment-verifications', '/coordinator/compre-exam', '/coordinator/compre-payment', '/student-records', '/dean/payment-rates', '/defense-register', '/schedules', '/generate-report', '/settings/signatures'],
+            'finance@uic.edu.ph' => ['/dashboard', '/honorarium-workspace', '/honorarium-documents', '/honorarium-ledger', '/defense-register', '/settings/profile'],
+            'dean@uic.edu.ph' => ['/dashboard', '/dean/payment-rates', '/settings/documents', '/dean/defense-requests', '/honorarium-workspace', '/honorarium-ledger', '/honorarium-documents', '/honorarium-summary', '/defense-register', '/student-records', '/schedules', '/settings/signatures', '/generate-report', '/panelists/honorarium-specs'],
             'superadmin@uic.edu.ph' => ['/dashboard'],
         ];
         $results = [];

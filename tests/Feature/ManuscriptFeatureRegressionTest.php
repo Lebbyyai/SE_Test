@@ -94,7 +94,9 @@ class ManuscriptFeatureRegressionTest extends TestCase
     public function test_dean_can_upload_a_pdf_template_and_student_cannot(): void
     {
         $dean = User::factory()->create(['role' => 'Dean']);
-        $file = UploadedFile::fake()->createWithContent('template.pdf', "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF");
+        $pdf = new FPDF;
+        $pdf->AddPage();
+        $file = UploadedFile::fake()->createWithContent('template.pdf', $pdf->Output('S'));
         $this->actingAs($dean)->postJson('/api/document-templates', ['name' => 'Endorsement Form (Proposal)', 'file' => $file])->assertOk();
         $template = DocumentTemplate::firstOrFail();
         Storage::disk('public')->assertExists($template->file_path);

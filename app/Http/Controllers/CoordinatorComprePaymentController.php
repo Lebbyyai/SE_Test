@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ExamReviewAccess;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,12 +14,10 @@ class CoordinatorComprePaymentController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        if (method_exists($user, 'isCoordinator') && ! $user->isCoordinator()) {
-            abort(403, 'Only coordinators can access this page.');
-        }
+        app(ExamReviewAccess::class)->authorize($user);
 
-        $programs = method_exists($user, 'allowedProgramNames') ? $user->allowedProgramNames() : [];
-        if (empty($programs)) {
+        $programs = app(ExamReviewAccess::class)->programs($user);
+        if (empty($programs) && $user->role !== 'Administrative Assistant') {
             return Inertia::render('coordinator/compre-payment/Index', [
                 'programs' => [],
                 'pending' => [],
@@ -68,7 +67,7 @@ class CoordinatorComprePaymentController extends Controller
                         ->orOn('u.school_id', '=', "p.$studentCol");
                 }
             })
-            ->whereIn('u.program', $programs)
+            ->when($user->role !== 'Administrative Assistant', fn ($query) => $query->whereIn('u.program', $programs))
             ->when(Schema::hasColumn($table, 'payment_type'), fn ($qq) => $qq->where('p.payment_type', 'exam'))
             ->where('u.id', '<>', $user->id) // exclude coordinator
             ->selectRaw(implode(', ', array_filter([
@@ -130,9 +129,7 @@ class CoordinatorComprePaymentController extends Controller
     public function approve(Request $request, int $id): RedirectResponse
     {
         $user = $request->user();
-        if (method_exists($user, 'isCoordinator') && ! $user->isCoordinator()) {
-            abort(403, 'Only coordinators can approve.');
-        }
+        app(ExamReviewAccess::class)->authorize($user);
 
         if (! Schema::hasTable('payment_submissions')) {
             return back()->withErrors(['status' => 'Payments table not found.']);
@@ -145,7 +142,8 @@ class CoordinatorComprePaymentController extends Controller
         $row = DB::table('payment_submissions as p')
             ->leftJoin('users as u', 'u.id', '=', 'p.student_id')
             ->where('p.payment_id', $id)
-            ->whereIn('u.program', $programs)
+            ->where('p.payment_type', 'exam')
+            ->when($user->role !== 'Administrative Assistant', fn ($query) => $query->whereIn('u.program', $programs))
             ->select('p.payment_id', 'p.status')
             ->first();
 
@@ -156,12 +154,17 @@ class CoordinatorComprePaymentController extends Controller
             return back()->withErrors(['status' => 'Only pending payments can be approved.']);
         }
 
-        DB::table('payment_submissions')
-            ->where('payment_id', $id)
+        $changed = DB::table('payment_submissions')
+            ->where('payment_id', $id)->where('status', 'pending')
             ->update([
                 'status' => 'approved',
+                'checked_by' => $user->id, 'checked_at' => now(),
                 'updated_at' => now(),
             ]);
+
+        if ($changed !== 1) {
+            return back()->withErrors(['status' => 'This payment has already been reviewed.']);
+        }
 
         return redirect()->route('coordinator.compre-payment.index')->with('success', 'Payment approved.');
     }
@@ -169,9 +172,7 @@ class CoordinatorComprePaymentController extends Controller
     public function reject(Request $request, int $id): RedirectResponse
     {
         $user = $request->user();
-        if (method_exists($user, 'isCoordinator') && ! $user->isCoordinator()) {
-            abort(403, 'Only coordinators can reject.');
-        }
+        app(ExamReviewAccess::class)->authorize($user);
 
         $request->validate([
             'remarks' => ['required', 'string', 'min:3', 'max:500'],
@@ -187,7 +188,8 @@ class CoordinatorComprePaymentController extends Controller
         $row = DB::table('payment_submissions as p')
             ->leftJoin('users as u', 'u.id', '=', 'p.student_id')
             ->where('p.payment_id', $id)
-            ->whereIn('u.program', $programs)
+            ->where('p.payment_type', 'exam')
+            ->when($user->role !== 'Administrative Assistant', fn ($query) => $query->whereIn('u.program', $programs))
             ->select('p.payment_id', 'p.status')
             ->first();
 
@@ -198,13 +200,18 @@ class CoordinatorComprePaymentController extends Controller
             return back()->withErrors(['status' => 'Only pending payments can be rejected.']);
         }
 
-        DB::table('payment_submissions')
-            ->where('payment_id', $id)
+        $changed = DB::table('payment_submissions')
+            ->where('payment_id', $id)->where('status', 'pending')
             ->update([
                 'status' => 'rejected',
+                'checked_by' => $user->id, 'checked_at' => now(),
                 'remarks' => $request->input('remarks'),
                 'updated_at' => now(),
             ]);
+
+        if ($changed !== 1) {
+            return back()->withErrors(['status' => 'This payment has already been reviewed.']);
+        }
 
         return redirect()->route('coordinator.compre-payment.index')->with('success', 'Payment rejected.');
     }

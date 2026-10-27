@@ -10,12 +10,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 
 class AdviserStudentController extends Controller
 {
     // Return accepted students only
     public function index(Request $request)
     {
+        abort_unless($request->user()?->role === 'Adviser', 403);
         $adviser = $request->user();
         $students = $adviser->advisedStudents()
             ->wherePivot('status', 'accepted')
@@ -52,6 +54,7 @@ class AdviserStudentController extends Controller
     // Return pending assignments (adviser view)
     public function pending(Request $request)
     {
+        abort_unless($request->user()?->role === 'Adviser', 403);
         $adviser = $request->user();
         $students = $adviser->advisedStudents()
             ->wherePivot('status', 'pending')
@@ -90,6 +93,7 @@ class AdviserStudentController extends Controller
     // Adviser accepts a pending student
     public function acceptPending(Request $request, $studentId)
     {
+        abort_unless($request->user()?->role === 'Adviser', 403);
         $request->validate(['send_email' => 'sometimes|boolean']);
 
         $adviser = $request->user();
@@ -131,6 +135,7 @@ class AdviserStudentController extends Controller
     // Adviser rejects a pending student (marks rejected and sends email)
     public function rejectPending(Request $request, $studentId)
     {
+        abort_unless($request->user()?->role === 'Adviser', 403);
         $request->validate(['send_email' => 'sometimes|boolean']);
 
         $adviser = $request->user();
@@ -183,24 +188,28 @@ class AdviserStudentController extends Controller
     // Direct attach by adviser (manual register)
     public function store(Request $request)
     {
+        abort_unless($request->user()?->role === 'Adviser', 403);
         $request->validate([
-            'student_id' => 'required|integer|exists:users,id',
+            'student_id' => ['required', 'integer', Rule::exists('users', 'id')->where('role', 'Student')],
         ]);
 
         $adviser = $request->user();
         $studentId = $request->input('student_id');
 
-        if ($adviser->advisedStudents()->where('student_id', $studentId)->exists()) {
-            return response()->json(['error' => 'Student is already registered with this adviser.'], 409);
-        }
+        return DB::transaction(function () use ($adviser, $studentId) {
+            $student = User::whereKey($studentId)->lockForUpdate()->firstOrFail();
+            if ($student->advisers()->wherePivotIn('status', ['accepted', 'pending'])->exists()) {
+                return response()->json(['error' => 'This student already has an accepted or pending adviser assignment.'], 409);
+            }
+            $adviser->advisedStudents()->syncWithoutDetaching([$studentId => ['status' => 'accepted']]);
 
-        $adviser->advisedStudents()->attach($studentId, ['status' => 'accepted']);
-
-        return response()->json(['success' => true]);
+            return response()->json(['success' => true]);
+        });
     }
 
     public function destroy(Request $request, $studentId)
     {
+        abort_unless($request->user()?->role === 'Adviser', 403);
         $adviser = $request->user();
         $adviser->advisedStudents()->detach($studentId);
 
@@ -209,6 +218,7 @@ class AdviserStudentController extends Controller
 
     public function getAdviserCode(Request $request)
     {
+        abort_unless($request->user()?->role === 'Adviser', 403);
         $adviser = $request->user();
         if (! $adviser->adviser_code) {
             $adviser->generateAdviserCode();

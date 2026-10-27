@@ -24,6 +24,7 @@ class ExamApplication extends Model
         'final_approval_status',
         'final_approval_DATE',
         'approved_by',
+        'reviewed_by', 'reviewed_at', 'review_remarks',
         'contact_number',
         'telephone_number',
         'office_address',

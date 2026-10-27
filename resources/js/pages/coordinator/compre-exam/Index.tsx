@@ -7,6 +7,9 @@ import TableCompreExam from './table-compre-exam';
 
 export type CompreExamApplicationSummary = {
     id: number;
+    application_id?: number | null;
+    review_remarks?: string | null;
+    reviewed_at?: string | null;
     first_name: string;
     middle_name: string | null;
     last_name: string;
@@ -32,10 +35,11 @@ export default function CoordinatorCompreExamIndex() {
     const { props } = usePage<PageProps>();
     const { eligible = [], notEligible = [] } = props;
 
-    const [tab] = useState<'eligible' | 'not'>('eligible');
+    const [tab, setTab] = useState<'applications' | 'students'>('applications');
     const [q, setQ] = useState('');
 
-    const data = tab === 'eligible' ? eligible : notEligible;
+    const allStudents = [...eligible, ...notEligible];
+    const data = allStudents.filter((student) => (tab === 'applications' ? student.applied : !student.applied));
 
     const paged = useMemo(() => {
         const query = q.trim().toLowerCase();
@@ -71,6 +75,20 @@ export default function CoordinatorCompreExamIndex() {
                     </div>
                 </div>
 
+                <div className="mt-4 flex gap-2" role="group" aria-label="Exam application views">
+                    <button
+                        className={`rounded-md border px-3 py-2 text-sm ${tab === 'applications' ? 'bg-muted font-semibold' : ''}`}
+                        onClick={() => setTab('applications')}
+                    >
+                        Applications
+                    </button>
+                    <button
+                        className={`rounded-md border px-3 py-2 text-sm ${tab === 'students' ? 'bg-muted font-semibold' : ''}`}
+                        onClick={() => setTab('students')}
+                    >
+                        Students not yet applied
+                    </button>
+                </div>
                 <div className="mt-3">
                     <TableCompreExam paged={paged} columns={columns} />
                 </div>

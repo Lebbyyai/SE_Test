@@ -20,13 +20,14 @@ class DefenseScheduleController extends Controller
         $user = Auth::user();
 
         // Ensure user is authorized
-        $coordinatorRoles = ['Coordinator', 'Administrative Assistant', 'Dean'];
+        $coordinatorRoles = ['Coordinator', 'Administrative Assistant', 'Dean', 'Super Admin'];
         if (! in_array($user->role, $coordinatorRoles)) {
             abort(403, 'Unauthorized access to defense schedule');
         }
 
         // Get all scheduled defenses
         $scheduledDefenses = DefenseRequest::with(['user', 'panelsAssignedBy', 'scheduleSetBy'])
+            ->when($user->role === 'Coordinator', fn ($q) => $q->where('coordinator_user_id', $user->id))
             ->whereNotNull('scheduled_date')
             ->whereNotNull('scheduled_time')
             ->whereIn('workflow_state', ['scheduled', 'completed'])
@@ -62,7 +63,9 @@ class DefenseScheduleController extends Controller
      */
     public function calendar(Request $request)
     {
-        $defenses = DefenseRequest::whereNotNull('scheduled_date')
+        $user = $request->user();
+        abort_unless(in_array($user?->role, ['Coordinator', 'Administrative Assistant', 'Dean', 'Super Admin'], true), 403);
+        $defenses = DefenseRequest::when($user->role === 'Coordinator', fn ($q) => $q->where('coordinator_user_id', $user->id))->whereNotNull('scheduled_date')
             ->whereNotNull('scheduled_time')
             ->whereIn('workflow_state', ['scheduled', 'completed'])
             ->get()
@@ -74,9 +77,9 @@ class DefenseScheduleController extends Controller
                     'school_id' => $defense->school_id,
                     'program' => $defense->program,
                     'defense_type' => $defense->defense_type,
-                    'date_of_defense' => $defense->scheduled_date->format('Y-m-d H:i:s'),
+                    'date_of_defense' => Carbon::parse($defense->scheduled_date->format('Y-m-d').' '.$defense->scheduled_time)->format('Y-m-d H:i:s'),
                     'scheduled_date' => $defense->scheduled_date->format('Y-m-d'),
-                    'scheduled_time' => $defense->scheduled_time->format('H:i'),
+                    'scheduled_time' => substr((string) $defense->scheduled_time, 0, 5),
                     'defense_mode' => $defense->defense_mode,
                     'defense_venue' => $defense->defense_venue,
                     'status' => ucfirst($defense->workflow_state),
@@ -93,7 +96,7 @@ class DefenseScheduleController extends Controller
      */
     public function checkConflicts(Request $request)
     {
-        abort_unless(in_array($request->user()?->role, ['Coordinator', 'Administrative Assistant', 'Dean'], true), 403);
+        abort_unless(in_array($request->user()?->role, ['Coordinator', 'Administrative Assistant', 'Dean', 'Super Admin'], true), 403);
         $data = $request->validate(['date' => 'required|date_format:Y-m-d', 'time' => 'required|date_format:H:i', 'end_time' => 'nullable|date_format:H:i|after:time', 'panels' => 'present|array', 'venue' => 'nullable|string', 'exclude_id' => 'nullable|integer']);
         $dr = new DefenseRequest;
         $dr->id = $data['exclude_id'] ?? 0;
@@ -115,7 +118,7 @@ class DefenseScheduleController extends Controller
 
     public function availablePanelists(Request $request)
     {
-        abort_unless(in_array($request->user()?->role, ['Coordinator', 'Administrative Assistant', 'Dean'], true), 403);
+        abort_unless(in_array($request->user()?->role, ['Coordinator', 'Administrative Assistant', 'Dean', 'Super Admin'], true), 403);
         $data = $request->validate(['date' => 'required|date_format:Y-m-d', 'time' => 'required|date_format:H:i', 'end_time' => 'nullable|date_format:H:i|after:time', 'exclude_id' => 'nullable|integer']);
         $dr = new DefenseRequest;
         $dr->id = $data['exclude_id'] ?? 0;

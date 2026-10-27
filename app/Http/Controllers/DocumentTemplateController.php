@@ -8,6 +8,8 @@ use App\Services\DocumentGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use setasign\Fpdi\Fpdi;
 
 class DocumentTemplateController extends Controller
 {
@@ -36,13 +38,19 @@ class DocumentTemplateController extends Controller
             'name' => 'required|string',
             'file' => 'required|file|mimes:pdf|max:10240',
         ]);
+        try {
+            $parser = new Fpdi;
+            $pageCount = $parser->setSourceFile($r->file('file')->getRealPath());
+        } catch (\Throwable $error) {
+            throw ValidationException::withMessages(['file' => 'Upload a readable, unencrypted PDF template.']);
+        }
         $code = \Str::slug($data['name']).'-'.uniqid();
         $path = $r->file('file')->store('templates', 'public');
         $tpl = DocumentTemplate::create([
             'name' => $data['name'],
             'code' => $code,
             'file_path' => $path,
-            'page_count' => 1,
+            'page_count' => $pageCount,
             'created_by' => $r->user()->id,
         ]);
 
@@ -52,8 +60,23 @@ class DocumentTemplateController extends Controller
     public function updateFields(Request $request, DocumentTemplate $template)
     {
         $this->authorizeManagement();
-        $template->fields = $request->input('fields', []);
-        $template->fields_meta = $request->input('fields_meta', []);
+        $data = $request->validate([
+            'fields' => 'present|array|max:300',
+            'fields.*.key' => 'required|string|max:120|regex:/^[a-zA-Z0-9_.]+$/',
+            'fields.*.type' => 'required|in:text,multiline,signature',
+            'fields.*.page' => 'required|integer|min:1|max:1000',
+            'fields.*.x' => 'required|numeric|min:0|max:20000',
+            'fields.*.y' => 'required|numeric|min:0|max:20000',
+            'fields.*.width' => 'required|numeric|gt:0|max:20000',
+            'fields.*.height' => 'required|numeric|gt:0|max:20000',
+            'fields.*.font_size' => 'sometimes|numeric|between:4,72',
+            'fields_meta' => 'sometimes|array',
+            'fields_meta.canvas_width' => 'required_with:fields_meta|numeric|gt:0|max:20000',
+            'fields_meta.canvas_height' => 'required_with:fields_meta|numeric|gt:0|max:20000',
+        ]);
+        $template->fields = $data['fields'];
+        $template->fields_meta = $data['fields_meta'] ?? [];
+
         $template->save();
 
         return response()->json(['ok' => true]);

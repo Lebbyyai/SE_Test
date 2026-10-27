@@ -12,12 +12,14 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
 
 class CoordinatorAdviserController extends Controller
 {
     // List all advisers for this coordinator
     public function index(Request $request)
     {
+        abort_unless($request->user()?->role === 'Coordinator', 403);
         $coordinator = $request->user();
 
         // Load all adviser rows for this coordinator
@@ -25,7 +27,7 @@ class CoordinatorAdviserController extends Controller
 
         // Preload any matching users by email to avoid N+1
         $emails = $adviserRows->pluck('email')->filter()->unique()->values()->all();
-        $usersByEmail = User::whereIn('email', $emails)->get()->keyBy('email');
+        $usersByEmail = User::where('role', 'Adviser')->whereIn('email', $emails)->get()->keyBy('email');
 
         $advisers = [];
 
@@ -116,6 +118,7 @@ class CoordinatorAdviserController extends Controller
     // Attach an adviser to this coordinator
     public function store(Request $request)
     {
+        abort_unless($request->user()?->role === 'Coordinator', 403);
         $coordinator = $request->user();
 
         $validated = $request->validate([
@@ -142,6 +145,9 @@ class CoordinatorAdviserController extends Controller
 
         // Simple check: is there a User with that email?
         $user = User::where('email', $validated['email'])->first();
+        if ($user && $user->role !== 'Adviser') {
+            throw ValidationException::withMessages(['email' => 'This account does not have the Adviser role.']);
+        }
 
         $status = $user ? 'active' : 'inactive';
 
@@ -204,6 +210,7 @@ class CoordinatorAdviserController extends Controller
     // Update adviser info
     public function update(Request $request, $id)
     {
+        abort_unless($request->user()?->role === 'Coordinator', 403);
         $coordinator = $request->user();
 
         $adviser = Adviser::where('coordinator_id', $coordinator->id)->findOrFail($id);
@@ -214,9 +221,9 @@ class CoordinatorAdviserController extends Controller
         ]);
 
         $parts = preg_split('/\s+/', trim($validated['name']));
-        $first = $parts[0] ?? '';
-        $last = count($parts) > 1 ? array_pop($parts) : '';
-        $middle = count($parts) > 1 ? implode(' ', array_slice($parts, 1, -1)) : null;
+        $first = count($parts) ? array_shift($parts) : '';
+        $last = count($parts) ? array_pop($parts) : '';
+        $middle = count($parts) ? implode(' ', $parts) : null;
 
         $adviser->first_name = $first;
         $adviser->middle_name = $middle;
@@ -225,6 +232,9 @@ class CoordinatorAdviserController extends Controller
 
         // Simple check: is there a User with that email?
         $user = User::where('email', $validated['email'])->first();
+        if ($user && $user->role !== 'Adviser') {
+            throw ValidationException::withMessages(['email' => 'This account does not have the Adviser role.']);
+        }
 
         $adviser->status = $user ? 'active' : 'inactive';
         $adviser->user_id = $user ? $user->id : null;
@@ -245,6 +255,7 @@ class CoordinatorAdviserController extends Controller
     // Send invitation email to inactive adviser
     public function sendInvitation(Request $request, $id)
     {
+        abort_unless($request->user()?->role === 'Coordinator', 403);
         $coordinator = $request->user();
 
         // Verify adviser belongs to this coordinator
@@ -314,6 +325,7 @@ class CoordinatorAdviserController extends Controller
     // Remove adviser and all their student relationships
     public function destroy(Request $request, $id)
     {
+        abort_unless($request->user()?->role === 'Coordinator', 403);
         $coordinator = $request->user();
         $adviser = Adviser::where('coordinator_id', $coordinator->id)->findOrFail($id);
 
@@ -322,6 +334,7 @@ class CoordinatorAdviserController extends Controller
             $adviserUser = User::find($adviser->user_id);
             if ($adviserUser) {
                 $adviserUser->advisedStudents()->wherePivot('requested_by', $coordinator->id)->detach();
+                $adviserUser->coordinators()->detach($coordinator->id);
             }
         }
 
@@ -333,6 +346,7 @@ class CoordinatorAdviserController extends Controller
     // Search advisers (autocomplete)
     public function search(Request $request)
     {
+        abort_unless($request->user()?->role === 'Coordinator', 403);
         $query = $request->input('query', '');
         $coordinator = $request->user();
 
@@ -355,6 +369,7 @@ class CoordinatorAdviserController extends Controller
     // Return students assigned (accepted) to an adviser
     public function students(Request $request, $adviserId)
     {
+        abort_unless($request->user()?->role === 'Coordinator', 403);
         $coordinator = $request->user();
         $adviser = Adviser::where('coordinator_id', $coordinator->id)->findOrFail($adviserId);
 
@@ -402,6 +417,7 @@ class CoordinatorAdviserController extends Controller
     // Return pending students for this adviser (coordinator view)
     public function pendingStudents(Request $request, $adviserId)
     {
+        abort_unless($request->user()?->role === 'Coordinator', 403);
         $coordinator = $request->user();
         $adviser = Adviser::where('coordinator_id', $coordinator->id)->findOrFail($adviserId);
 
@@ -451,12 +467,13 @@ class CoordinatorAdviserController extends Controller
     // Assign an existing student (create pivot with status = 'pending')
     public function storeStudent(Request $request, $adviserId)
     {
+        abort_unless($request->user()?->role === 'Coordinator', 403);
         $coordinator = $request->user();
         $adviser = Adviser::where('coordinator_id', $coordinator->id)->findOrFail($adviserId);
 
         // enforce active adviser (linked user)
         if (! $adviser->user_id && $adviser->email) {
-            $matchedUser = User::where('email', $adviser->email)->first();
+            $matchedUser = User::where('role', 'Adviser')->where('email', $adviser->email)->first();
             if ($matchedUser) {
                 $adviser->user_id = $matchedUser->id;
                 $adviser->status = 'active';
@@ -485,6 +502,11 @@ class CoordinatorAdviserController extends Controller
         } else {
             return response()->json(['error' => 'student_id or email required.'], 422);
         }
+
+        if (! $student || $student->role !== 'Student') {
+            throw ValidationException::withMessages(['student_id' => 'Choose an account with the Student role.']);
+        }
+        abort_unless(User::whereKey($adviser->user_id)->where('role', 'Adviser')->exists(), 422, 'This account is no longer an adviser.');
 
         // Check if student is already assigned to ANY adviser (pending or accepted)
         $alreadyAssigned = $student->advisers()
@@ -539,6 +561,7 @@ class CoordinatorAdviserController extends Controller
     // Detach a student from adviser
     public function destroyStudent(Request $request, $adviserId, $studentId)
     {
+        abort_unless($request->user()?->role === 'Coordinator', 403);
         $coordinator = $request->user();
         $adviser = Adviser::where('coordinator_id', $coordinator->id)->findOrFail($adviserId);
 

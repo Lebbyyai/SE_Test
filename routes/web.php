@@ -335,9 +335,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/comprehensive-exam', [ComprehensiveExamController::class, 'index'])->name('comprehensive-exam.index');
     Route::post('/comprehensive-exam', [ComprehensiveExamController::class, 'store'])->name('comprehensive-exam.store');
 
+    Route::get('/dean/defense-requests', function () {
+        abort_unless(in_array(Auth::user()->role, ['Dean', 'Super Admin'], true), 403);
+
+        return redirect('/defense-requests');
+    });
+
     /* Coordinator Comprehensive Exam */
     Route::get('/coordinator/compre-exam', [CoordinatorCompreExamController::class, 'index'])
         ->name('coordinator.compre-exam.index');
+    Route::post('/coordinator/compre-exam/{application}/review', [CoordinatorCompreExamController::class, 'review'])->name('coordinator.compre-exam.review');
     Route::get('/coordinator/compre-payment', [CoordinatorComprePaymentController::class, 'index'])
         ->name('coordinator.compre-payment.index');
     Route::post('/coordinator/compre-payment/{id}/approve', [CoordinatorComprePaymentController::class, 'approve'])
@@ -346,7 +353,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('coordinator.compre-payment.reject');
 
     /* Honorarium / Reports */
-    Route::get('/generate-report', fn () => Inertia::render('honorarium/generate-report/Index'))
+    Route::get('/generate-report', function () {
+        abort_unless(in_array(Auth::user()->role, ['Administrative Assistant', 'Dean', 'Super Admin'], true), 403);
+
+        return redirect()->route('honorarium-summary.index');
+    })
         ->name('generate-report.index');
     // Honorarium data is supplied by HonorariumSummaryController above.
 
@@ -458,10 +469,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         })->name('defense-requests.details');
     });
 
-    /* Profile */
-    Route::get('/profile', function () {
-        return Inertia::render('profile/Edit');
-    })->name('profile.edit');
+    // Profile and its legacy alias are registered in settings.php.
 
     // Add this route for the adviser students list page
     Route::get('/adviser/students-list', function () {
@@ -532,6 +540,7 @@ Route::get('/api/coordinator/defense-requests', function () {
     }
 
     $records = DefenseRequest::query()
+        ->when($user->role === 'Coordinator', fn ($query) => $query->where('coordinator_user_id', $user->id))
         ->whereIn('workflow_state', [
             'adviser-approved',
             'coordinator-review',
@@ -626,6 +635,7 @@ Route::get('/adviser/defense-requirements/{id}/details', function ($id) {
     }
 
     $defenseRequest = DefenseRequest::findOrFail($id);
+    abort_unless((int) $defenseRequest->adviser_user_id === (int) $user->id, 403);
 
     // Fetch all coordinators linked to this adviser
     $coordinators = $user->coordinators()
@@ -652,23 +662,7 @@ Route::get('/adviser/defense-requirements/{id}/details', function ($id) {
 Route::post('/adviser/defense-requirements/{defenseRequest}/documents', [DefenseRequestController::class, 'uploadDocuments'])
     ->name('adviser.defense-requirements.upload-documents');
 
-Route::post('/adviser/defense-requirements/{id}/endorsement-form', function ($id) {
-    $req = DefenseRequest::findOrFail($id);
-    $url = request('url');
-    if (! $url) {
-        return response()->json(['error' => 'No URL provided'], 422);
-    }
-    // Extract the relative path if a full URL is provided
-    if (preg_match('#/storage/(.+)$#', $url, $m)) {
-        $relative = $m[1];
-    } else {
-        $relative = $url;
-    }
-    $req->endorsement_form = $relative;
-    $req->save();
-
-    return response()->json(['ok' => true]);
-});
+Route::post('/adviser/defense-requirements/{defenseRequest}/endorsement-form', [DefenseRequestController::class, 'attachEndorsement']);
 
 /* Document Generation API */
 Route::post('/api/generate-document', [GeneratedDocumentController::class, 'generateDocument']);

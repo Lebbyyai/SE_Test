@@ -7,7 +7,9 @@ use App\Models\DocumentTemplate;
 use App\Models\GeneratedDocument;
 use App\Models\User;
 use App\Models\UserSignature;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use setasign\Fpdi\Fpdi;
 
 class DocumentGenerator
@@ -45,7 +47,8 @@ class DocumentGenerator
 
         for ($p = 1; $p <= $pageCount; $p++) {
             $tplId = $pdf->importPage($p);
-            $pdf->AddPage();
+            $pageSize = $pdf->getTemplateSize($tplId);
+            $pdf->AddPage($pageSize['orientation'], [$pageSize['width'], $pageSize['height']]);
             $pdf->useTemplate($tplId);
 
             // Get page size in mm
@@ -78,14 +81,14 @@ class DocumentGenerator
                 }
 
                 $val = $this->value($f['key'], $payload);
-                if (! $val) {
+                if ($val === null || $val === '') {
                     continue;
                 }
 
                 $pdf->SetXY($x, $y);
                 // Set font to Arial everywhere (no DejaVu)
                 $pdf->SetFont('Arial', '', $f['font_size'] ?? 12);
-                $pdf->Cell($w, $h, $val, 0, 0, 'C'); // 'C' for center
+                $pdf->Cell($w, $h, iconv('UTF-8', 'Windows-1252//TRANSLIT', (string) $val), 0, 0, 'C'); // 'C' for center
             }
         }
 
@@ -95,40 +98,40 @@ class DocumentGenerator
             Storage::disk('public')->makeDirectory($directory);
         }
 
-        $out = "generated/defense/{$req->id}_{$tpl->code}_".time().'.pdf';
+        $out = 'generated/defense/'.$req->id.'_'.$tpl->id.'_'.Str::uuid().'.pdf';
         $pdfContent = $pdf->Output('S');
         if (! $pdfContent || strlen($pdfContent) < 100) {
-            \Log::error("PDF generation failed: empty or invalid PDF content for $out");
-            throw new \Exception('PDF generation failed: empty or invalid PDF content');
+            throw new \RuntimeException('The generated PDF is empty.');
         }
+        if (! Storage::disk('public')->put($out, $pdfContent)) {
+            throw new \RuntimeException('Unable to save the generated PDF.');
+        }
+        $previousPaths = [];
+        try {
+            $generated = DB::transaction(function () use ($req, $tpl, $out, $payload, $pdfContent, &$previousPaths) {
+                DefenseRequest::whereKey($req->id)->lockForUpdate()->firstOrFail();
+                $previous = GeneratedDocument::where('defense_request_id', $req->id)->where('document_template_id', $tpl->id)->get();
+                $previousPaths = $previous->pluck('output_path')->all();
+                $generated = GeneratedDocument::create([
+                    'defense_request_id' => $req->id, 'document_template_id' => $tpl->id,
+                    'template_version_used' => $tpl->version, 'output_path' => $out,
+                    'payload' => $payload, 'status' => 'generated', 'sha256' => hash('sha256', $pdfContent),
+                ]);
+                foreach ($previous as $document) {
+                    $document->delete();
+                }
+                // Preserve an already attached endorsement when regenerating its template.
+                if (in_array(ltrim(preg_replace('#^/?storage/#', '', (string) $req->endorsement_form), '/'), $previousPaths, true)) {
+                    $req->update(['endorsement_form' => $out]);
+                }
 
-        // Delete old generated documents for this request/template
-        GeneratedDocument::where('defense_request_id', $req->id)
-            ->where('document_template_id', $tpl->id)
-            ->get()
-            ->each(function ($doc) {
-                Storage::disk('public')->delete($doc->output_path);
-                $doc->delete();
+                return $generated;
             });
-
-        Storage::disk('public')->put($out, $pdfContent);
-
-        if (! Storage::disk('public')->exists($out)) {
-            \Log::error("Generated PDF not found at: $out");
-            throw new \Exception("Generated PDF not found at: $out");
+        } catch (\Throwable $error) {
+            Storage::disk('public')->delete($out);
+            throw $error;
         }
-
-        $hash = hash('sha256', $pdfContent);
-
-        $generated = GeneratedDocument::create([
-            'defense_request_id' => $req->id,
-            'document_template_id' => $tpl->id,
-            'template_version_used' => $tpl->version,
-            'output_path' => $out,
-            'payload' => json_encode($payload),
-            'status' => 'generated',
-            'sha256' => $hash,
-        ]);
+        Storage::disk('public')->delete($previousPaths);
 
         return $generated;
     }

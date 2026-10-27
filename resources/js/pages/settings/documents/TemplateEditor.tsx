@@ -1,9 +1,11 @@
 import { Button } from '@/components/ui/button';
+import { csrfHeaders } from '@/lib/csrf';
 import { errorMessage } from '@/lib/error-message';
 import { Head } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Rnd } from 'react-rnd';
+import { toast } from 'sonner';
 
 // PDF.js imports for Vite/React
 import * as pdfjsLib from 'pdfjs-dist';
@@ -107,21 +109,20 @@ export default function TemplateEditorPage({ templateId, template }: Props) {
 
     async function save() {
         setSaving(true);
-        await fetch(`/api/document-templates/${templateId}/fields`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
-            },
-            body: JSON.stringify({
-                fields,
-                fields_meta: {
-                    canvas_width: pdfPages[0]?.width,
-                    canvas_height: pdfPages[0]?.height,
-                },
-            }),
-        });
-        setSaving(false);
+        try {
+            const response = await fetch(`/api/document-templates/${templateId}/fields`, {
+                method: 'PUT',
+                headers: csrfHeaders(true),
+                body: JSON.stringify({ fields, fields_meta: { canvas_width: pdfPages[0]?.width, canvas_height: pdfPages[0]?.height } }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Unable to save the template mapping.');
+            toast.success('Template mapping saved.');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Unable to connect. Please try again.');
+        } finally {
+            setSaving(false);
+        }
     }
 
     const handleFieldSelect = (field: Field) => {

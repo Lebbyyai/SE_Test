@@ -92,7 +92,8 @@ const assistantNavItems: MainNavItem[] = [
         icon: FileText,
         subItems: [
             { title: 'Comprehensive Exams', href: '/coordinator/compre-exam' },
-            { title: 'Payment Receipt', href: '/coordinator/compre-payment' },
+            { title: 'Exam Receipts', href: '/coordinator/compre-payment' },
+            { title: 'Defense Receipts', href: '/aa/payment-verifications' },
         ],
     },
     { title: 'Honorarium Summary', href: '/honorarium-summary', icon: DollarSign },
@@ -176,7 +177,7 @@ export function AppSidebar() {
     }, [expandedMenus]);
 
     // Show "Others" section for Adviser, Coordinator, Dean, or actual Adviser
-    const showOthers = user.role === 'Adviser' || user.role === 'Coordinator' || user.role === 'Dean' || is_adviser; // <-- Only show if user is an actual adviser
+    const showOthers = user.role === 'Adviser' || Boolean(is_adviser); // <-- Only show if user is an actual adviser
 
     // Items for the Others section
     const othersNavItems: MainNavItem[] = [

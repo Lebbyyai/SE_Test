@@ -10,12 +10,15 @@ class StudentRecordController extends Controller
 {
     public function index(Request $request)
     {
+        abort_unless(in_array(auth()->user()?->role, ['Coordinator', 'Administrative Assistant', 'Dean', 'Super Admin'], true), 403);
         $records = StudentRecord::with('payments') // eager load payments
             ->when($request->input('search'), function ($query, $search) {
-                $query->where('first_name', 'like', "%{$search}%")
-                    ->orWhere('middle_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhere('student_id', 'like', "%{$search}%");
+                $query->where(function ($names) use ($search) {
+                    $names->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('middle_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('student_id', 'like', "%{$search}%");
+                });
             })
             ->when($request->input('year'), function ($query, $year) {
                 $query->where('school_year', $year);
@@ -35,6 +38,7 @@ class StudentRecordController extends Controller
 
     public function show(StudentRecord $studentRecord)
     {
+        abort_unless(in_array(auth()->user()?->role, ['Coordinator', 'Administrative Assistant', 'Dean', 'Super Admin'], true), 403);
         // Load related payments
         $studentRecord->load('payments');
 
@@ -45,7 +49,8 @@ class StudentRecordController extends Controller
 
     public function update(Request $request, StudentRecord $studentRecord)
     {
-        $request->validate([
+        abort_unless(in_array(auth()->user()?->role, ['Coordinator', 'Administrative Assistant', 'Dean', 'Super Admin'], true), 403);
+        $data = $request->validate([
             'first_name' => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name' => 'required|string|max:255',
@@ -60,13 +65,14 @@ class StudentRecordController extends Controller
             'payment_date' => 'required|date',
         ]);
 
-        $studentRecord->update($request->all());
+        $studentRecord->update($data);
 
         return redirect()->back()->with('success', 'Record updated successfully.');
     }
 
     public function destroy(StudentRecord $studentRecord)
     {
+        abort_unless(in_array(auth()->user()?->role, ['Coordinator', 'Administrative Assistant', 'Dean', 'Super Admin'], true), 403);
         $studentRecord->delete();
 
         return redirect()->back()->with('success', 'Record deleted successfully.');

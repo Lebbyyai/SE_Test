@@ -73,7 +73,7 @@ export default function QuickActionsWidget({ userRole }: Props) {
                       ...action,
                       href:
                           userRole === 'Administrative Assistant'
-                              ? '/payment-verifications'
+                              ? '/coordinator/compre-payment'
                               : userRole === 'Dean'
                                 ? '/dean/payment-rates'
                                 : '/coordinator/compre-payment',

@@ -83,6 +83,7 @@ class PaymentSubmissionController extends Controller
             'payment_date' => $validated['payment_date'],
             'amount_paid' => $validated['amount_paid'],
             'status' => 'pending',
+            'checked_by' => null, 'checked_at' => null, 'remarks' => null,
         ];
 
         if ($request->hasFile('receipt_image')) {

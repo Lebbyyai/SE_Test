@@ -1,5 +1,5 @@
 {
-    "checked_at": "2026-10-27T15:45:37+00:00",
+    "checked_at": "2026-10-27T16:30:50+00:00",
     "pages": [
         {
             "role": "Student",
@@ -38,6 +38,69 @@
             "error": null
         },
         {
+            "role": "Student",
+            "url": "/payment",
+            "status": 200,
+            "redirect_to": null,
+            "component": "payment/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Student",
+            "url": "/student/documents",
+            "status": 200,
+            "redirect_to": null,
+            "component": "student/documents/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Student",
+            "url": "/academic-records",
+            "status": 200,
+            "redirect_to": null,
+            "component": "student/academic-records/academic-records",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Student",
+            "url": "/settings/profile",
+            "status": 200,
+            "redirect_to": null,
+            "component": "settings/profile",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Student",
+            "url": "/settings/password",
+            "status": 200,
+            "redirect_to": null,
+            "component": "settings/password",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Student",
+            "url": "/settings/appearance",
+            "status": 200,
+            "redirect_to": null,
+            "component": "settings/appearance",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Student",
+            "url": "/settings/signatures",
+            "status": 200,
+            "redirect_to": null,
+            "component": "settings/signatures/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
             "role": "Adviser",
             "url": "/dashboard",
             "status": 200,
@@ -71,6 +134,69 @@
             "redirect_to": null,
             "component": "honorarium/ledger/Index",
             "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Adviser",
+            "url": "/schedules",
+            "status": 302,
+            "redirect_to": "http://localhost/schedule",
+            "component": null,
+            "component_exists": null,
+            "error": null
+        },
+        {
+            "role": "Adviser",
+            "url": "/honorarium-workspace",
+            "status": 200,
+            "redirect_to": null,
+            "component": "honorarium/workspace/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Adviser",
+            "url": "/defense-register",
+            "status": 200,
+            "redirect_to": null,
+            "component": "defense-register/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Adviser",
+            "url": "/settings/general",
+            "status": 200,
+            "redirect_to": null,
+            "component": "settings/general",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Adviser",
+            "url": "/settings/signatures",
+            "status": 200,
+            "redirect_to": null,
+            "component": "settings/signatures/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Adviser",
+            "url": "/api/adviser/students",
+            "status": 200,
+            "redirect_to": null,
+            "component": null,
+            "component_exists": null,
+            "error": null
+        },
+        {
+            "role": "Adviser",
+            "url": "/api/adviser/pending-students",
+            "status": 200,
+            "redirect_to": null,
+            "component": null,
+            "component_exists": null,
             "error": null
         },
         {
@@ -146,6 +272,69 @@
             "error": null
         },
         {
+            "role": "Coordinator",
+            "url": "/coordinator/compre-payment",
+            "status": 200,
+            "redirect_to": null,
+            "component": "coordinator/compre-payment/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Coordinator",
+            "url": "/coordinator/schedule/calendar",
+            "status": 200,
+            "redirect_to": null,
+            "component": null,
+            "component_exists": null,
+            "error": null
+        },
+        {
+            "role": "Coordinator",
+            "url": "/student-records",
+            "status": 200,
+            "redirect_to": null,
+            "component": "student-records/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Coordinator",
+            "url": "/dean/payment-rates",
+            "status": 200,
+            "redirect_to": null,
+            "component": "dean/payment-rates/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Coordinator",
+            "url": "/defense-register",
+            "status": 200,
+            "redirect_to": null,
+            "component": "defense-register/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Coordinator",
+            "url": "/settings/general",
+            "status": 200,
+            "redirect_to": null,
+            "component": "settings/general",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Coordinator",
+            "url": "/settings/signatures",
+            "status": 200,
+            "redirect_to": null,
+            "component": "settings/signatures/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
             "role": "Administrative Assistant",
             "url": "/dashboard",
             "status": 200,
@@ -200,6 +389,87 @@
             "error": null
         },
         {
+            "role": "Administrative Assistant",
+            "url": "/aa/payment-verifications",
+            "status": 200,
+            "redirect_to": null,
+            "component": "assistant/payment-verifications/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Administrative Assistant",
+            "url": "/coordinator/compre-exam",
+            "status": 200,
+            "redirect_to": null,
+            "component": "coordinator/compre-exam/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Administrative Assistant",
+            "url": "/coordinator/compre-payment",
+            "status": 200,
+            "redirect_to": null,
+            "component": "coordinator/compre-payment/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Administrative Assistant",
+            "url": "/student-records",
+            "status": 200,
+            "redirect_to": null,
+            "component": "student-records/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Administrative Assistant",
+            "url": "/dean/payment-rates",
+            "status": 200,
+            "redirect_to": null,
+            "component": "dean/payment-rates/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Administrative Assistant",
+            "url": "/defense-register",
+            "status": 200,
+            "redirect_to": null,
+            "component": "defense-register/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Administrative Assistant",
+            "url": "/schedules",
+            "status": 302,
+            "redirect_to": "http://localhost/schedule",
+            "component": null,
+            "component_exists": null,
+            "error": null
+        },
+        {
+            "role": "Administrative Assistant",
+            "url": "/generate-report",
+            "status": 302,
+            "redirect_to": "http://localhost/honorarium-summary",
+            "component": null,
+            "component_exists": null,
+            "error": null
+        },
+        {
+            "role": "Administrative Assistant",
+            "url": "/settings/signatures",
+            "status": 200,
+            "redirect_to": null,
+            "component": "settings/signatures/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
             "role": "Finance",
             "url": "/dashboard",
             "status": 302,
@@ -223,6 +493,33 @@
             "status": 200,
             "redirect_to": null,
             "component": "honorarium/documents/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Finance",
+            "url": "/honorarium-ledger",
+            "status": 200,
+            "redirect_to": null,
+            "component": "honorarium/ledger/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Finance",
+            "url": "/defense-register",
+            "status": 200,
+            "redirect_to": null,
+            "component": "defense-register/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Finance",
+            "url": "/settings/profile",
+            "status": 200,
+            "redirect_to": null,
+            "component": "settings/profile",
             "component_exists": true,
             "error": null
         },
@@ -251,6 +548,105 @@
             "redirect_to": null,
             "component": "settings/documents/Index",
             "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Dean",
+            "url": "/dean/defense-requests",
+            "status": 302,
+            "redirect_to": "http://localhost/defense-requests",
+            "component": null,
+            "component_exists": null,
+            "error": null
+        },
+        {
+            "role": "Dean",
+            "url": "/honorarium-workspace",
+            "status": 200,
+            "redirect_to": null,
+            "component": "honorarium/workspace/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Dean",
+            "url": "/honorarium-ledger",
+            "status": 200,
+            "redirect_to": null,
+            "component": "honorarium/ledger/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Dean",
+            "url": "/honorarium-documents",
+            "status": 200,
+            "redirect_to": null,
+            "component": "honorarium/documents/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Dean",
+            "url": "/honorarium-summary",
+            "status": 200,
+            "redirect_to": null,
+            "component": "honorarium/honorarium-summary/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Dean",
+            "url": "/defense-register",
+            "status": 200,
+            "redirect_to": null,
+            "component": "defense-register/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Dean",
+            "url": "/student-records",
+            "status": 200,
+            "redirect_to": null,
+            "component": "student-records/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Dean",
+            "url": "/schedules",
+            "status": 302,
+            "redirect_to": "http://localhost/schedule",
+            "component": null,
+            "component_exists": null,
+            "error": null
+        },
+        {
+            "role": "Dean",
+            "url": "/settings/signatures",
+            "status": 200,
+            "redirect_to": null,
+            "component": "settings/signatures/Index",
+            "component_exists": true,
+            "error": null
+        },
+        {
+            "role": "Dean",
+            "url": "/generate-report",
+            "status": 302,
+            "redirect_to": "http://localhost/honorarium-summary",
+            "component": null,
+            "component_exists": null,
+            "error": null
+        },
+        {
+            "role": "Dean",
+            "url": "/panelists/honorarium-specs",
+            "status": 302,
+            "redirect_to": "http://localhost/dean/payment-rates",
+            "component": null,
+            "component_exists": null,
             "error": null
         },
         {
