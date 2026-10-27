@@ -503,9 +503,9 @@ export default function SubmitDefenseRequirements({ open, onOpenChange, acceptDe
             title: 'Review Submission',
             content: (
                 <div className="space-y-6">
-                    <div className="space-y-4 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm">
+                    <div className="space-y-4 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm break-words text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100">
                         <div>
-                            <div className="mb-1 font-semibold text-rose-700">Personal Information</div>
+                            <div className="mb-1 font-semibold text-rose-700 dark:text-rose-400">Personal Information</div>
                             <div className="grid grid-cols-1 gap-x-8 gap-y-1 md:grid-cols-2">
                                 <div>
                                     <span className="font-medium">Name:</span> {`${data.first_name} ${data.middle_name} ${data.last_name}`}
@@ -523,7 +523,7 @@ export default function SubmitDefenseRequirements({ open, onOpenChange, acceptDe
                         </div>
                         <Separator />
                         <div>
-                            <div className="mb-1 font-semibold text-rose-700">Defense Details</div>
+                            <div className="mb-1 font-semibold text-rose-700 dark:text-rose-400">Defense Details</div>
                             <div className="grid grid-cols-1 gap-x-8 gap-y-1 md:grid-cols-2">
                                 <div>
                                     <span className="font-medium">Type of Defense:</span> {data.defense_type}
@@ -535,7 +535,7 @@ export default function SubmitDefenseRequirements({ open, onOpenChange, acceptDe
                         </div>
                         <Separator />
                         <div>
-                            <div className="mb-1 font-semibold text-rose-700">Document Uploads</div>
+                            <div className="mb-1 font-semibold text-rose-700 dark:text-rose-400">Document Uploads</div>
                             <div className="grid grid-cols-1 gap-x-8 gap-y-1 md:grid-cols-2">
                                 {(data.defense_type === 'Prefinal' || data.defense_type === 'Final') && (
                                     <div>
@@ -561,7 +561,7 @@ export default function SubmitDefenseRequirements({ open, onOpenChange, acceptDe
                         </div>
                         <Separator />
                         <div>
-                            <div className="mb-1 font-semibold text-rose-700">Payment</div>
+                            <div className="mb-1 font-semibold text-rose-700 dark:text-rose-400">Payment</div>
                             <div className="grid grid-cols-1 gap-y-1">
                                 <div>
                                     <span className="font-medium">Proof of Payment:</span>{' '}
