@@ -78,7 +78,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
         setImportError('');
     }
 
-    async function importCsv(mode: 'preview' | 'apply') {
+    async function importRatesFile(mode: 'preview' | 'apply') {
         if (!importFile) return;
         setImporting(true);
         setImportError('');
@@ -429,18 +429,20 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                         <DialogHeader>
                             <DialogTitle>Import payment rates</DialogTitle>
                             <DialogDescription>
-                                Upload the CSV exported from the server or this system. Each row's program_level identifies Masteral or Doctorate, so
-                                one file imports both programs regardless of the selected tab. Use numeric amounts without currency signs or commas.
-                                Blank amounts and omitted rates are kept; enter 0 for a zero rate.
+                                Upload CSV, JSON or XLSX. Use the same four fields: program_level, type, defense_type and amount. Each row's
+                                program_level identifies Masteral or Doctorate, so one file imports both programs regardless of the selected tab. Use
+                                numeric amounts without currency signs or commas. Blank amounts and omitted rates are kept; enter 0 for a zero rate.
+                                JSON accepts an array of rate objects or a rates array. XLSX worksheets use those four column headings and values
+                                without formulas.
                             </DialogDescription>
                         </DialogHeader>
                         <label htmlFor="payment-rate-csv" className="text-sm font-medium">
-                            CSV file (maximum 256 KB)
+                            CSV, JSON or XLSX file (maximum 256 KB)
                         </label>
                         <Input
                             id="payment-rate-csv"
                             type="file"
-                            accept=".csv,text/csv"
+                            accept=".csv,.json,.xlsx,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                             disabled={importing}
                             onChange={(event) => {
                                 setImportFile(event.target.files?.[0] ?? null);
@@ -500,11 +502,11 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                                 Cancel
                             </Button>
                             {importRows.length === 0 ? (
-                                <Button disabled={!importFile || importing} onClick={() => importCsv('preview')}>
+                                <Button disabled={!importFile || importing} onClick={() => importRatesFile('preview')}>
                                     {importing ? 'Checking...' : 'Review import'}
                                 </Button>
                             ) : (
-                                <Button disabled={importing} onClick={() => importCsv('apply')}>
+                                <Button disabled={importing} onClick={() => importRatesFile('apply')}>
                                     {importing ? 'Saving...' : 'Apply import'}
                                 </Button>
                             )}

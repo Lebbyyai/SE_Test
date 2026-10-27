@@ -115,7 +115,7 @@ class PaymentRateController extends Controller
     {
         abort_unless(in_array($request->user()?->role, ['Dean', 'Super Admin']), 403);
         $validated = $request->validate([
-            'file' => ['required', 'file', 'max:256', 'extensions:csv', 'mimetypes:text/plain,text/csv,application/csv,application/vnd.ms-excel'],
+            'file' => ['required', 'file', 'max:256', 'extensions:csv,json,xlsx', 'mimetypes:text/plain,text/csv,application/csv,application/json,text/json,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip'],
             'mode' => ['required', Rule::in(['preview', 'apply'])],
         ]);
         $rows = $csv->parse($request->file('file'));

@@ -18,57 +18,46 @@ class PaymentRateCsv
 
     public function parse(UploadedFile $file): array
     {
-        $handle = fopen($file->getRealPath(), 'rb');
-        try {
-            $header = fgetcsv($handle, 0, ',', '"', '');
-            if (is_array($header)) {
-                $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', $header[0]);
+        $rows = [];
+        $seen = [];
+        $records = app(PaymentRateFileReader::class)->rows($file);
+        foreach ($records as $index => $cells) {
+            $line = $index + 2;
+            if ($cells === [null] || count(array_filter($cells, fn ($value) => $value !== null && $value !== '')) === 0) {
+                continue;
             }
-            if ($header !== self::HEADER) {
-                $this->invalid('Use the exported CSV template with headers: '.implode(', ', self::HEADER).'.');
+            if ($index >= 200 || count($cells) !== 4 || count(array_filter($cells, fn ($value) => $value !== null && ! is_string($value) && ! is_int($value) && ! is_float($value)))) {
+                $this->invalid("Row {$line}: expected four text or numeric values and at most 200 rate rows.");
             }
-            $rows = [];
-            $seen = [];
-            $line = 1;
-            while (($cells = fgetcsv($handle, 0, ',', '"', '')) !== false) {
-                $line++;
-                if ($cells === [null] || count(array_filter($cells, fn ($value) => trim((string) $value) !== '')) === 0) {
-                    continue;
-                }
-                if ($line > 201 || count($cells) !== 4) {
-                    $this->invalid("Row {$line}: expected four columns and at most 200 rate rows.");
-                }
-                [$program, $type, $stage, $amount] = array_map('trim', $cells);
-                if (! in_array($program, self::LEVELS, true)) {
-                    $this->invalid("Row {$line}: unknown program '{$program}'. Use Masteral or Doctorate.");
-                }
-                if (! in_array($type, self::TYPES, true)) {
-                    $this->invalid("Row {$line}: unknown rate type '{$type}'. Use a rate type from the exported template.");
-                }
-                if (! in_array($stage, self::STAGES, true)) {
-                    $this->invalid("Row {$line}: unknown defense stage '{$stage}'. Use Proposal, Pre-final or Final. Correct the row and check for duplicate rates before importing.");
-                }
-                $key = $program.'|'.$type.'|'.$stage;
-                if (isset($seen[$key])) {
-                    $this->invalid("Row {$line}: duplicate rate for {$type}, {$stage}.");
-                }
-                $seen[$key] = true;
-                if ($amount === '') {
-                    continue;
-                }
-                if (! preg_match('/^\d{1,8}(?:\.\d{1,2})?$/D', $amount)) {
-                    $this->invalid("Row {$line}: amount must be from 0 to 99999999.99, with at most two decimal places and no currency signs or commas.");
-                }
-                $rows[] = ['program_level' => $program, 'type' => $type, 'defense_type' => $stage, 'amount' => $amount];
+            $cells = array_map(fn ($value) => $value === null ? '' : (string) $value, $cells);
+            [$program, $type, $stage, $amount] = array_map('trim', $cells);
+            if (! in_array($program, self::LEVELS, true)) {
+                $this->invalid("Row {$line}: unknown program '{$program}'. Use Masteral or Doctorate.");
             }
-            if ($rows === []) {
-                $this->invalid('Enter at least one numeric amount in the CSV. Blank amounts leave rates unchanged.');
+            if (! in_array($type, self::TYPES, true)) {
+                $this->invalid("Row {$line}: unknown rate type '{$type}'. Use a rate type from the exported template.");
             }
-
-            return $rows;
-        } finally {
-            fclose($handle);
+            if (! in_array($stage, self::STAGES, true)) {
+                $this->invalid("Row {$line}: unknown defense stage '{$stage}'. Use Proposal, Pre-final or Final. Correct the row and check for duplicate rates before importing.");
+            }
+            $key = $program.'|'.$type.'|'.$stage;
+            if (isset($seen[$key])) {
+                $this->invalid("Row {$line}: duplicate rate for {$type}, {$stage}.");
+            }
+            $seen[$key] = true;
+            if ($amount === '') {
+                continue;
+            }
+            if (! preg_match('/^\d{1,8}(?:\.\d{1,2})?$/D', $amount)) {
+                $this->invalid("Row {$line}: amount must be from 0 to 99999999.99, with at most two decimal places and no currency signs or commas.");
+            }
+            $rows[] = ['program_level' => $program, 'type' => $type, 'defense_type' => $stage, 'amount' => $amount];
         }
+        if ($rows === []) {
+            $this->invalid('Enter at least one numeric amount in the file. Blank amounts leave rates unchanged.');
+        }
+
+        return $rows;
     }
 
     public function preview(array $rows): array
