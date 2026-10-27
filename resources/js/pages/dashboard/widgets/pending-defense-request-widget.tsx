@@ -93,8 +93,7 @@ const PendingDefenseRequestsWidget: React.FC<Props> = ({ pendingRequests, loadin
                                                 {req.thesis_title || <span className="text-gray-400">N/A</span>}
                                             </td>
                                             <td className="w-1/5 px-2 py-2">
-                                                {/* Adviser: just show N/A or blank, since not in type */}
-                                                <span className="text-gray-400">N/A</span>
+                                                {req.adviser || req.defense_adviser || <span className="text-muted-foreground">Not assigned</span>}
                                             </td>
                                             <td className="w-1/5 px-2 py-2">
                                                 {/* Presenter: first_name + last_name */}

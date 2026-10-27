@@ -66,7 +66,7 @@ class DefenseRequestController extends Controller
                     'thesis_title', 'defense_type', 'status', 'priority', 'workflow_state',
                     'scheduled_date', 'scheduled_time', 'scheduled_end_time',
                     'defense_mode', 'defense_venue', 'panels_assigned_at',
-                    'defense_adviser', 'adviser_reviewed_at',
+                    'defense_adviser', 'adviser_reviewed_at', 'created_at',
                     'defense_chairperson', 'defense_panelist1', 'defense_panelist2', 'defense_panelist3', 'defense_panelist4',
                     'coordinator_status', // <-- ADDED
                 ])->map(function ($r) {
@@ -114,11 +114,8 @@ class DefenseRequestController extends Controller
                         'normalized_status' => $this->normalizeStatusForCoordinator($r),
                         // ADD THESE TWO FIELDS:
                         'adviser' => $r->defense_adviser ?: '—',
-                        'submitted_at' => $r->adviser_reviewed_at
-                            ? (is_object($r->adviser_reviewed_at)
-                                ? $r->adviser_reviewed_at->format('Y-m-d H:i:s')
-                                : date('Y-m-d H:i:s', strtotime($r->adviser_reviewed_at)))
-                            : '—',
+                        'created_at' => $r->created_at?->toIso8601String(),
+                        'submitted_at' => $r->created_at?->toIso8601String(),
                         // ADD THIS LINE:
                         'panelists' => $panelists,
                         // <-- ADDED

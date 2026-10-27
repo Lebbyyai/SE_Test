@@ -40,7 +40,9 @@ class ScheduleEventController extends Controller
             ->whereNotNull('scheduled_date')
             ->whereIn('workflow_state', ['scheduled', 'completed']);
 
-        if ($user->role === 'Student') {
+        if ($user->role === 'Coordinator') {
+            $defQuery->where('coordinator_user_id', $user->id);
+        } elseif ($user->role === 'Student') {
             $defQuery->where('submitted_by', $user->id);
         } elseif (in_array($user->role, ['Adviser'])) {
             $defQuery->where(function ($q) use ($user) {
@@ -78,7 +80,7 @@ class ScheduleEventController extends Controller
             ];
         })->filter();
 
-        return response()->json($events->merge($defenses)->values());
+        return response()->json(collect($events->all())->concat($defenses)->values());
     }
 
     public function store(Request $r)

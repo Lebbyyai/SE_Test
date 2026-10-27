@@ -34,3 +34,33 @@ test('adviser dashboard calendar includes assigned defenses and school events wi
     expect($rows->pluck('title')->all())->toContain('Graduate school event')->toContain('Defense: '.$mine->thesis_title)->not->toContain('Defense: '.$theirs->thesis_title);
     expect($rows->where('origin', 'defense')->count())->toBe(1);
 });
+
+test('coordinator calendar returns their assigned defenses and excludes another coordinator schedule', function () {
+    $coordinator = User::factory()->create(['role' => 'Coordinator']);
+    $other = User::factory()->create(['role' => 'Coordinator']);
+    $mine = dashboardScheduledDefense(User::factory()->create(['role' => 'Student']));
+    $mine->update(['coordinator_user_id' => $coordinator->id]);
+    $theirs = dashboardScheduledDefense(User::factory()->create(['role' => 'Student']));
+    $theirs->update(['coordinator_user_id' => $other->id]);
+    $response = $this->actingAs($coordinator)->getJson('/api/calendar/events?from=2026-10-01&to=2026-10-31')->assertOk();
+    expect(collect($response->json())->pluck('title')->all())->toContain('Defense: '.$mine->thesis_title)->not->toContain('Defense: '.$theirs->thesis_title);
+});
+
+test('dashboard request feed includes the saved adviser and actual submission timestamp', function () {
+    // The production query uses MySQL FIELD ordering; supply equivalent ordering in isolated SQLite tests.
+    \Illuminate\Support\Facades\DB::connection()->getPdo()->sqliteCreateFunction('FIELD', static function ($value, ...$values) {
+        $index = array_search($value, $values, true);
+
+        return $index === false ? 0 : $index + 1;
+    });
+    $dean = User::factory()->create(['role' => 'Dean']);
+    $request = dashboardScheduledDefense(User::factory()->create(['role' => 'Student']));
+    $request->created_at = '2026-10-20 09:00:00';
+    $request->adviser_reviewed_at = '2026-10-27 10:00:00';
+    $request->save();
+    $expectedDate = $request->fresh()->created_at->toIso8601String();
+    $this->actingAs($dean)->getJson('/defense-requests')->assertOk()
+        ->assertJsonPath('defenseRequests.0.adviser', 'Test Adviser')
+        ->assertJsonPath('defenseRequests.0.submitted_at', $expectedDate)
+        ->assertJsonPath('defenseRequests.0.created_at', $expectedDate);
+});

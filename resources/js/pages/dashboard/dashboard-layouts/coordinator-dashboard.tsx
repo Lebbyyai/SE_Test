@@ -7,8 +7,8 @@ import { BadgeDollarSign, CalendarDays, ClipboardList, Moon, Sun, Users } from '
 import React, { useEffect, useState } from 'react';
 import PendingDefenseRequestsWidget from '../widgets/pending-defense-request-widget';
 import QuickActionsWidget from '../widgets/quick-actions-widget';
+import SchedulesWidget from '../widgets/student-schedules-widget';
 import DefenseCountLineChart from '../widgets/visual-charts/defense-count';
-import WeeklyDefenseSchedulesWidget from '../widgets/weekly-defense-schedule-widget';
 
 type PageProps = {
     auth: {
@@ -34,49 +34,14 @@ function isDaytime() {
     return hour >= 6 && hour < 18;
 }
 
-// Helper: Get unique panelists from defense requests
-function getPanelistStats(defenseRequests: DefenseOverview[]) {
-    const panelistSet = new Set<string>();
-    let assignedCount = 0;
-
-    defenseRequests.forEach((req) => {
-        if (Array.isArray(req.panelists)) {
-            req.panelists.forEach((p) => {
-                if (p?.id) {
-                    panelistSet.add(String(p.id));
-                    assignedCount++;
-                }
-            });
-        }
-    });
-
-    return {
-        totalPanelists: panelistSet.size,
-        assignedPanelists: assignedCount,
-    };
-}
-
-// Helper: Count today's scheduled defenses
-function getTodaysSchedules(defenseRequests: DefenseOverview[]) {
-    const today = new Date();
-    return defenseRequests.filter((dr: DefenseOverview) => {
-        if (!dr.scheduled_date) return false;
-        const eventDate = new Date(dr.scheduled_date);
-        return (
-            eventDate.getFullYear() === today.getFullYear() && eventDate.getMonth() === today.getMonth() && eventDate.getDate() === today.getDate()
-        );
-    }).length;
-}
-
 export default function CoordinatorDashboard() {
     const {
         auth: { user },
         panelists, // <-- Add this line to get panelists from Inertia props if available
     } = usePage<PageProps & { panelists?: unknown[] }>().props;
 
-    const [allRequests, setAllRequests] = useState<DefenseOverview[]>([]);
+    const [todayEventCount, setTodayEventCount] = useState<number | null>(null);
     const [pendingRequests, setPendingRequests] = useState<DefenseOverview[]>([]);
-    const [, setTodayEvents] = useState<DefenseOverview[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Add this state for real panelists count
@@ -87,20 +52,8 @@ export default function CoordinatorDashboard() {
     // Advisers linked to this coordinator
     const [advisersCount, setAdvisersCount] = useState<number>(0);
 
-    const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
-
     // Example: Assigned programs count (replace with real API if available)
     const [assignedProgramsCount, setAssignedProgramsCount] = useState<number>(0);
-
-    const weekDays = [
-        { label: 'Sun', value: 0 },
-        { label: 'Mon', value: 1 },
-        { label: 'Tue', value: 2 },
-        { label: 'Wed', value: 3 },
-        { label: 'Thu', value: 4 },
-        { label: 'Fri', value: 5 },
-        { label: 'Sat', value: 6 },
-    ];
 
     const [tab, setTab] = useState('overview');
 
@@ -116,25 +69,13 @@ export default function CoordinatorDashboard() {
             })
             .then((data) => {
                 const requests = Array.isArray(data) ? data : (data.defenseRequests ?? []);
-                setAllRequests(requests);
 
                 // Prefer normalized_status when available, fallback to status
                 const pending = requests.filter((r: DefenseOverview) => (r.normalized_status || r.status) === 'Pending');
                 setPendingRequests(pending);
-
-                const today = new Date();
-                const closeEvents = requests.filter((dr: DefenseOverview) => {
-                    if (!dr.scheduled_date) return false;
-                    const eventDate = new Date(dr.scheduled_date);
-                    const diff = (eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
-                    return diff >= 0 && diff < 3;
-                });
-                setTodayEvents(closeEvents);
             })
             .catch(() => {
-                setAllRequests([]);
                 setPendingRequests([]);
-                setTodayEvents([]);
             })
             .finally(() => setLoading(false));
 
@@ -182,8 +123,6 @@ export default function CoordinatorDashboard() {
     }, []);
 
     // Dynamic metrics
-    getPanelistStats(allRequests);
-    const todaysSchedules = getTodaysSchedules(allRequests);
 
     // Panelists count: use panelists from props if available, otherwise fallback to assignedPanelistsCount
     const panelistsCount = Array.isArray(panelists) ? panelists.length : 0;
@@ -198,9 +137,9 @@ export default function CoordinatorDashboard() {
             iconTheme: 'bg-rose-100 text-rose-600 dark:bg-rose-900 dark:text-rose-300',
         },
         {
-            title: "Today's Defense Schedules",
-            value: todaysSchedules,
-            description: 'Defenses scheduled for today',
+            title: "Today's Schedules",
+            value: todayEventCount ?? 'Checking...',
+            description: 'Defenses and school events today',
             icon: <CalendarDays className="size-5 text-blue-500" />,
             iconTheme: 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300',
         },
@@ -322,14 +261,7 @@ export default function CoordinatorDashboard() {
                                 {/* Widgets Body - Mobile Responsive */}
                                 <div className="dark:bg-muted mt-2 mb-2 flex w-full flex-col gap-4 rounded-lg bg-gray-100 px-3 py-4 md:gap-6 md:rounded-xl md:px-4 md:py-8">
                                     <div className="mb-2 flex w-full flex-col gap-4">
-                                        <WeeklyDefenseSchedulesWidget
-                                            weekDays={weekDays}
-                                            selectedDay={selectedDay}
-                                            setSelectedDay={setSelectedDay}
-                                            approvedDefenses={allRequests}
-                                            referenceDate={new Date()}
-                                            loading={loading}
-                                        />
+                                        <SchedulesWidget onTodayCount={setTodayEventCount} />
                                         <PendingDefenseRequestsWidget pendingRequests={pendingRequests} loading={loading} />
                                     </div>
                                 </div>
