@@ -25,7 +25,7 @@ export function scheduleOnDay(item: Schedule, day: Date): boolean {
     return !['cancelled', 'canceled', 'rejected'].includes(state) && start <= key && end >= key;
 }
 
-export default function StudentSchedulesWidget({ onTodayCount }: { onTodayCount: (count: number) => void }) {
+export default function StudentSchedulesWidget({ onTodayCount }: { onTodayCount?: (count: number) => void }) {
     const [selected, setSelected] = useState(() => new Date());
     const [month, setMonth] = useState(() => startOfMonth(new Date()));
     const [events, setEvents] = useState<Schedule[]>([]);
@@ -60,7 +60,7 @@ export default function StudentSchedulesWidget({ onTodayCount }: { onTodayCount:
                 setEvents(rows);
                 const today = format(new Date(), 'yyyy-MM-dd');
                 if (today >= format(first, 'yyyy-MM-dd') && today <= format(last, 'yyyy-MM-dd'))
-                    onTodayCount(rows.filter((item) => scheduleOnDay(item, new Date())).length);
+                    onTodayCount?.(rows.filter((item) => scheduleOnDay(item, new Date())).length);
             } catch {
                 if (!controller.signal.aborted) {
                     setEvents([]);

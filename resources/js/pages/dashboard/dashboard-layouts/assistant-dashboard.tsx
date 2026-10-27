@@ -7,7 +7,7 @@ import { BarChart3, CalendarDays, CircleEllipsis, ClipboardList, DollarSign, Moo
 import React, { useEffect, useState } from 'react';
 import PendingDefenseRequestsWidget from '../widgets/pending-defense-request-widget';
 import QuickActionsWidget from '../widgets/quick-actions-widget';
-import WeeklyDefenseSchedulesWidget from '../widgets/weekly-defense-schedule-widget';
+import SchedulesWidget from '../widgets/student-schedules-widget';
 
 type PageProps = {
     auth: {
@@ -60,20 +60,7 @@ export default function AssistantDashboard() {
     const [pendingPayments, setPendingPayments] = useState<number>(stats.pending_payments ?? 0);
     const [pendingDefenseRequests, setPendingDefenseRequests] = useState<number>(stats.pending_defense_requests ?? 0);
 
-    const [allRequests, setAllRequests] = useState<DefenseOverview[]>([]);
     const [pendingRequests, setPendingRequests] = useState<DefenseOverview[]>([]);
-    const [selectedDay, setSelectedDay] = useState<number>(new Date().getDay());
-
-    const weekDays = [
-        { label: 'Sun', value: 0 },
-        { label: 'Mon', value: 1 },
-        { label: 'Tue', value: 2 },
-        { label: 'Wed', value: 3 },
-        { label: 'Thu', value: 4 },
-        { label: 'Fri', value: 5 },
-        { label: 'Sat', value: 6 },
-    ];
-
     useEffect(() => {
         // If server-side props already include the AA-specific metrics, skip fetching.
         if (pendingHonorariums !== null && todaysDefenses !== null) return;
@@ -107,7 +94,6 @@ export default function AssistantDashboard() {
                 setPendingDefenseRequests(defenseRequests.count ?? 0);
 
                 const requests = Array.isArray(allDefenseRequests) ? allDefenseRequests : (allDefenseRequests.defenseRequests ?? []);
-                setAllRequests(requests);
 
                 const pending = requests.filter((r: DefenseOverview) => (r.normalized_status || r.status) === 'Pending');
                 setPendingRequests(pending);
@@ -246,14 +232,7 @@ export default function AssistantDashboard() {
                                 {/* Widgets Body - Mobile Responsive */}
                                 <div className="dark:bg-muted mt-2 mb-2 flex w-full flex-col gap-4 rounded-lg bg-gray-100 px-3 py-4 md:gap-6 md:rounded-xl md:px-4 md:py-8">
                                     <div className="mb-2 flex w-full flex-col gap-4">
-                                        <WeeklyDefenseSchedulesWidget
-                                            weekDays={weekDays}
-                                            selectedDay={selectedDay}
-                                            setSelectedDay={setSelectedDay}
-                                            approvedDefenses={allRequests}
-                                            referenceDate={new Date()}
-                                            loading={loading}
-                                        />
+                                        <SchedulesWidget />
                                         <PendingDefenseRequestsWidget pendingRequests={pendingRequests} loading={loading} />
                                     </div>
                                 </div>

@@ -64,3 +64,13 @@ test('dashboard request feed includes the saved adviser and actual submission ti
         ->assertJsonPath('defenseRequests.0.submitted_at', $expectedDate)
         ->assertJsonPath('defenseRequests.0.created_at', $expectedDate);
 });
+
+test('assistant calendar includes scheduled defenses and school events but excludes unscheduled requests', function () {
+    $assistant = User::factory()->create(['role' => 'Administrative Assistant']);
+    $scheduled = dashboardScheduledDefense(User::factory()->create(['role' => 'Student']));
+    $unscheduled = dashboardScheduledDefense(User::factory()->create(['role' => 'Student']));
+    $unscheduled->update(['scheduled_date' => null, 'workflow_state' => 'submitted']);
+    Event::create(['title' => 'Graduate school meeting', 'start_at' => '2026-10-27 13:00:00', 'end_at' => '2026-10-27 14:00:00', 'all_day' => false, 'type' => 'general', 'created_by' => $assistant->id]);
+    $response = $this->actingAs($assistant)->getJson('/api/calendar/events?from=2026-10-01&to=2026-10-31')->assertOk();
+    expect(collect($response->json())->pluck('title')->all())->toContain('Defense: '.$scheduled->thesis_title)->toContain('Graduate school meeting')->not->toContain('Defense: '.$unscheduled->thesis_title);
+});
