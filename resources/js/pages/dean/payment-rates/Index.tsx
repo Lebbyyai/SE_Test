@@ -64,7 +64,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
     const [saving, setSaving] = useState(false);
     const [tab, setTab] = useState<string>(PROGRAM_LEVELS[0]); // Add state for tab
 
-    const [importLevel, setImportLevel] = useState<string | null>(null);
+    const [importOpen, setImportOpen] = useState(false);
     const [importFile, setImportFile] = useState<File | null>(null);
     const [importRows, setImportRows] = useState<(Rate & { previous_amount: number | null; action: string })[]>([]);
     const [importing, setImporting] = useState(false);
@@ -72,20 +72,19 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
 
     function closeImport() {
         if (importing) return;
-        setImportLevel(null);
+        setImportOpen(false);
         setImportFile(null);
         setImportRows([]);
         setImportError('');
     }
 
     async function importCsv(mode: 'preview' | 'apply') {
-        if (!importFile || !importLevel) return;
+        if (!importFile) return;
         setImporting(true);
         setImportError('');
         try {
             const form = new FormData();
             form.append('file', importFile);
-            form.append('program_level', importLevel);
             form.append('mode', mode);
             const response = await fetch('/dean/payment-rates/import', {
                 method: 'POST',
@@ -105,7 +104,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                 setRates(data.rates);
                 setImportRows([]);
                 setImportFile(null);
-                setImportLevel(null);
+                setImportOpen(false);
                 toast.success(`${data.count} rate entries imported.`);
             }
         } catch (error) {
@@ -192,9 +191,9 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
     }
 
     function displayAmount(val: string | number | undefined) {
-        const num = parseFloat(val as string);
-        if (!val || isNaN(num) || num === 0) return '--';
-        return `â‚±${num.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+        if (val === undefined || val === '') return '--';
+        const num = Number(val);
+        return Number.isFinite(num) ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(num) : '--';
     }
 
     function getRows(program_level: string) {
@@ -224,9 +223,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
         const data = rows.map((row) => {
             const values = DEFENSE_TYPES.map((dtype, idx) => {
                 const val = row.values[idx]?.amount;
-                return val === undefined || val === null
-                    ? '--'
-                    : `â‚±${parseFloat(val as string).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+                return displayAmount(val);
             });
             return [row.type, ...values];
         });
@@ -237,7 +234,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                 const total = rates
                     .filter((r) => r.program_level === program_level && r.defense_type === dtype && !r.type.startsWith('External Panel '))
                     .reduce((sum, r) => sum + (parseFloat(String(r.amount)) || 0), 0);
-                return total === 0 ? '--' : `â‚±${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+                return displayAmount(total);
             }),
         ];
 
@@ -330,7 +327,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                             </a>
                         </Button>
                         {canEdit && (
-                            <Button variant="outline" onClick={() => setImportLevel(tab)}>
+                            <Button variant="outline" onClick={() => setImportOpen(true)}>
                                 <Upload className="h-4 w-4" /> Import
                             </Button>
                         )}
@@ -423,18 +420,18 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                     ))}
                 </Tabs>
                 <Dialog
-                    open={importLevel !== null}
+                    open={importOpen}
                     onOpenChange={(open) => {
                         if (!open) closeImport();
                     }}
                 >
                     <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
                         <DialogHeader>
-                            <DialogTitle>Import {importLevel} payment rates</DialogTitle>
+                            <DialogTitle>Import payment rates</DialogTitle>
                             <DialogDescription>
-                                Export the selected program CSV first, edit it in Excel, and save as CSV. Use numeric amounts without currency signs
-                                or commas. Only filled amounts are updated; blank amounts, omitted rates, and other programs are kept. Enter 0 to set
-                                a zero rate.
+                                Upload the CSV exported from the server or this system. Each row's program_level identifies Masteral or Doctorate, so
+                                one file imports both programs regardless of the selected tab. Use numeric amounts without currency signs or commas.
+                                Blank amounts and omitted rates are kept; enter 0 for a zero rate.
                             </DialogDescription>
                         </DialogHeader>
                         <label htmlFor="payment-rate-csv" className="text-sm font-medium">
@@ -465,6 +462,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
+                                                <TableHead>Program</TableHead>
                                                 <TableHead>Type</TableHead>
                                                 <TableHead>Defense</TableHead>
                                                 <TableHead>Current</TableHead>
@@ -474,7 +472,8 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                                         </TableHeader>
                                         <TableBody>
                                             {importRows.map((row) => (
-                                                <TableRow key={`${row.type}-${row.defense_type}`}>
+                                                <TableRow key={`${row.program_level}-${row.type}-${row.defense_type}`}>
+                                                    <TableCell>{row.program_level}</TableCell>
                                                     <TableCell>{row.type}</TableCell>
                                                     <TableCell>{row.defense_type}</TableCell>
                                                     <TableCell>
@@ -499,7 +498,7 @@ export default function PaymentRatesPage({ rates: initialRates }: Props) {
                                 </Button>
                             ) : (
                                 <Button disabled={importing} onClick={() => importCsv('apply')}>
-                                    {importing ? 'Savingï¿½' : 'Apply import'}
+                                    {importing ? 'Saving...' : 'Apply import'}
                                 </Button>
                             )}
                         </DialogFooter>

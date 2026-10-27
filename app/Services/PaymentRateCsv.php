@@ -16,7 +16,7 @@ class PaymentRateCsv
 
     public const TYPES = ['Adviser', 'Panel Chair', 'Panel Member', 'Panel Member 1', 'Panel Member 2', 'Panel Member 3', 'Panel Member 4', 'External Panel Chair', 'External Panel Member', 'REC Fee', 'School Share'];
 
-    public function parse(UploadedFile $file, string $level): array
+    public function parse(UploadedFile $file): array
     {
         $handle = fopen($file->getRealPath(), 'rb');
         try {
@@ -42,16 +42,13 @@ class PaymentRateCsv
                 if (! in_array($program, self::LEVELS, true)) {
                     $this->invalid("Row {$line}: unknown program '{$program}'. Use Masteral or Doctorate.");
                 }
-                if ($program !== $level) {
-                    continue;
-                }
                 if (! in_array($type, self::TYPES, true)) {
                     $this->invalid("Row {$line}: unknown rate type '{$type}'. Use a rate type from the exported template.");
                 }
                 if (! in_array($stage, self::STAGES, true)) {
                     $this->invalid("Row {$line}: unknown defense stage '{$stage}'. Use Proposal, Pre-final or Final. Correct the row and check for duplicate rates before importing.");
                 }
-                $key = $type.'|'.$stage;
+                $key = $program.'|'.$type.'|'.$stage;
                 if (isset($seen[$key])) {
                     $this->invalid("Row {$line}: duplicate rate for {$type}, {$stage}.");
                 }
@@ -65,7 +62,7 @@ class PaymentRateCsv
                 $rows[] = ['program_level' => $program, 'type' => $type, 'defense_type' => $stage, 'amount' => $amount];
             }
             if ($rows === []) {
-                $this->invalid("Enter at least one numeric amount for {$level} in the CSV. Blank amounts leave rates unchanged.");
+                $this->invalid('Enter at least one numeric amount in the CSV. Blank amounts leave rates unchanged.');
             }
 
             return $rows;

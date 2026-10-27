@@ -113,11 +113,10 @@ class PaymentRateController extends Controller
     {
         abort_unless(in_array($request->user()?->role, ['Dean', 'Super Admin']), 403);
         $validated = $request->validate([
-            'program_level' => ['required', Rule::in(PaymentRateCsv::LEVELS)],
             'file' => ['required', 'file', 'max:256', 'extensions:csv', 'mimetypes:text/plain,text/csv,application/csv,application/vnd.ms-excel'],
             'mode' => ['required', Rule::in(['preview', 'apply'])],
         ]);
-        $rows = $csv->parse($request->file('file'), $validated['program_level']);
+        $rows = $csv->parse($request->file('file'));
         if ($validated['mode'] === 'preview') {
             return response()->json(['rows' => $csv->preview($rows)]);
         }

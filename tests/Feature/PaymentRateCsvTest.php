@@ -94,12 +94,13 @@ test('empty programs export a usable template and blank amounts preserve existin
     $this->assertDatabaseHas('payment_rates', ['type' => 'Adviser', 'defense_type' => 'Proposal', 'amount' => 50]);
 });
 
-test('server CSV containing both programs previews only the selected program', function () {
+test('server CSV detects both programs regardless of the selected tab', function () {
     $this->actingAs(User::factory()->create(['role' => 'Dean']));
     $this->postJson('/dean/payment-rates/import', rateImportPayload("Doctorate,Adviser,Proposal,4000\nMasteral,Adviser,Proposal,2000", 'preview'))
-        ->assertOk()->assertJsonCount(1, 'rows')->assertJsonPath('rows.0.program_level', 'Masteral')->assertJsonPath('rows.0.amount', '2000');
+        ->assertOk()->assertJsonCount(2, 'rows')->assertJsonPath('rows.0.program_level', 'Doctorate')->assertJsonPath('rows.1.program_level', 'Masteral');
     $this->postJson('/dean/payment-rates/import', rateImportPayload("Doctorate,Adviser,Proposal,4000\nMasteral,Adviser,Proposal,2000"))->assertOk();
-    $this->assertDatabaseMissing('payment_rates', ['program_level' => 'Doctorate']);
+    $this->assertDatabaseHas('payment_rates', ['program_level' => 'Doctorate', 'amount' => 4000]);
+    $this->assertDatabaseHas('payment_rates', ['program_level' => 'Masteral', 'amount' => 2000]);
 });
 
 test('misspelled server stage is reported without guessing or overwriting an existing final rate', function () {
@@ -108,4 +109,11 @@ test('misspelled server stage is reported without guessing or overwriting an exi
     $this->postJson('/dean/payment-rates/import', rateImportPayload("Masteral,Adviser,Fincal Defense,2000\nMasteral,Adviser,Final,1000"))
         ->assertUnprocessable()->assertJsonValidationErrors('file')->assertJsonFragment(['file' => ["Row 2: unknown defense stage 'Fincal Defense'. Use Proposal, Pre-final or Final. Correct the row and check for duplicate rates before importing."]]);
     $this->assertDatabaseHas('payment_rates', ['program_level' => 'Masteral', 'type' => 'Adviser', 'defense_type' => 'Final', 'amount' => 1000]);
+});
+
+test('auto detection needs no program parameter and validates all programs before applying', function () {
+    $this->actingAs(User::factory()->create(['role' => 'Dean']));
+    $this->postJson('/dean/payment-rates/import', ['mode' => 'preview', 'file' => rateCsvUpload("Masteral,Adviser,Final,2000\nDoctorate,Adviser,Final,1000")])->assertOk()->assertJsonCount(2, 'rows');
+    $this->postJson('/dean/payment-rates/import', ['mode' => 'apply', 'file' => rateCsvUpload("Masteral,Adviser,Final,2000\nDoctorate,Adviser,Final,-1")])->assertUnprocessable();
+    $this->assertDatabaseCount('payment_rates', 0);
 });

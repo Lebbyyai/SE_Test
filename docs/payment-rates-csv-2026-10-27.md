@@ -4,7 +4,7 @@ Open `/dean/payment-rates`. Export, Import and Print appear above the rate table
 
 - Select Masteral or Doctorate, then Export to download that program's CSV. Missing rates have blank amounts so a new database still gets a usable template.
 - Open the file in Excel, enter amounts, and save as CSV (comma delimited / UTF-8). Keep the column names `program_level,type,defense_type,amount`.
-- Files may contain both programs; only entries for the selected program are imported. Review the current and incoming values, then Apply import.
+- Files may contain both programs; each row is assigned to its program automatically and both programs are imported in one operation. Review the current and incoming values, then Apply import.
 - Blank amounts and omitted entries remain unchanged. Enter 0 explicitly to set a zero rate.
 - Imports are limited to Dean and Super Admin. Coordinator and Administrative Assistant retain read/export access.
 - Files are limited to 256 KB and 200 rows. Invalid headers, duplicate rate keys, unsupported types/stages, formulas, negative values, excessive precision and amounts outside the database range are rejected before any write.
