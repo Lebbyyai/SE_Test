@@ -3,6 +3,7 @@
 use App\Models\DefenseRequest;
 use App\Models\Event;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 function dashboardScheduledDefense(User $student): DefenseRequest
@@ -74,4 +75,34 @@ test('assistant calendar includes scheduled defenses and school events but exclu
     Event::create(['title' => 'Graduate school meeting', 'start_at' => '2026-10-27 13:00:00', 'end_at' => '2026-10-27 14:00:00', 'all_day' => false, 'type' => 'general', 'created_by' => $assistant->id]);
     $response = $this->actingAs($assistant)->getJson('/api/calendar/events?from=2026-10-01&to=2026-10-31')->assertOk();
     expect(collect($response->json())->pluck('title')->all())->toContain('Defense: '.$scheduled->thesis_title)->toContain('Graduate school meeting')->not->toContain('Defense: '.$unscheduled->thesis_title);
+});
+
+test('calendar feed labels saved Philippine defense hours correctly even when the app runs in UTC', function () {
+    config(['app.timezone' => 'UTC']);
+    $student = User::factory()->create(['role' => 'Student']);
+    $defense = DefenseRequest::withoutEvents(fn () => DefenseRequest::create([
+        'submitted_by' => $student->id, 'first_name' => 'Time', 'last_name' => 'Test',
+        'school_id' => 'TIME-TEST', 'program' => 'Master of Arts', 'thesis_title' => 'Philippine time fixture',
+        'defense_type' => 'Proposal', 'defense_adviser' => 'Test Adviser', 'proof_of_payment' => 'receipt.pdf', 'status' => 'Approved', 'workflow_state' => 'scheduled',
+        'scheduled_date' => '2026-10-30', 'scheduled_time' => '09:00:00', 'scheduled_end_time' => '12:00:00',
+    ]));
+    $response = $this->actingAs($student)->getJson('/api/calendar/events?from=2026-10-01&to=2026-10-31')->assertOk();
+    $event = collect($response->json())->firstWhere('id', 'def-'.$defense->id);
+    expect($event['start'])->toBe('2026-10-30T09:00:00+08:00')
+        ->and($event['end'])->toBe('2026-10-30T12:00:00+08:00');
+    expect(CarbonImmutable::parse($event['start'])->setTimezone('Asia/Manila')->format('H:i'))->toBe('09:00');
+});
+
+test('calendar feed preserves the Philippine date for a defense shortly after midnight', function () {
+    config(['app.timezone' => 'UTC']);
+    $student = User::factory()->create(['role' => 'Student']);
+    $defense = DefenseRequest::withoutEvents(fn () => DefenseRequest::create([
+        'submitted_by' => $student->id, 'first_name' => 'Time', 'last_name' => 'Test',
+        'school_id' => 'MIDNIGHT-TEST', 'program' => 'Master of Arts', 'thesis_title' => 'Midnight fixture',
+        'defense_type' => 'Proposal', 'defense_adviser' => 'Test Adviser', 'proof_of_payment' => 'receipt.pdf', 'status' => 'Approved', 'workflow_state' => 'scheduled',
+        'scheduled_date' => '2026-10-30', 'scheduled_time' => '00:30:00', 'scheduled_end_time' => '01:30:00',
+    ]));
+    $response = $this->actingAs($student)->getJson('/api/calendar/events?from=2026-10-01&to=2026-10-31')->assertOk();
+    $event = collect($response->json())->firstWhere('id', 'def-'.$defense->id);
+    expect(CarbonImmutable::parse($event['start'])->setTimezone('Asia/Manila')->format('Y-m-d H:i'))->toBe('2026-10-30 00:30');
 });

@@ -64,8 +64,8 @@ class ScheduleEventController extends Controller
             return [
                 'id' => 'def-'.$d->id,
                 'title' => 'Defense: '.(mb_strimwidth($d->thesis_title ?? 'Untitled', 0, 60, '…')),
-                'start' => Carbon::parse("$startDate $startTime")->toIso8601String(),
-                'end' => Carbon::parse("$startDate $endTime")->toIso8601String(),
+                'start' => Carbon::parse("$startDate $startTime", 'Asia/Manila')->toIso8601String(),
+                'end' => Carbon::parse("$startDate $endTime", 'Asia/Manila')->toIso8601String(),
                 'allDay' => false,
                 'editable' => false,
                 'type' => 'defense',
