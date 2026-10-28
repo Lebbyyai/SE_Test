@@ -1343,11 +1343,15 @@ class DefenseRequestController extends Controller
 
         $data = $request->validate([
             'adviser_status' => 'required|in:Pending,Approved,Rejected',
+            'comment' => 'nullable|required_if:adviser_status,Rejected|string|min:3|max:3000',
             'coordinator_user_id' => 'nullable|integer|exists:users,id', // <-- add this
         ]);
 
         $fromState = $defenseRequest->workflow_state;
         $defenseRequest->adviser_status = $data['adviser_status'];
+        if ($data['adviser_status'] === 'Rejected') {
+            $defenseRequest->adviser_comments = trim($data['comment']);
+        }
 
         // Update workflow_state based on status
         if ($data['adviser_status'] === 'Approved') {
@@ -1371,6 +1375,7 @@ class DefenseRequestController extends Controller
         $hist[] = [
             'action' => 'adviser-status-updated',
             'adviser_status' => $data['adviser_status'],
+            'comment' => $data['comment'] ?? null,
             'timestamp' => now()->toISOString(),
             'user_id' => $user->id,
             'user_name' => $user->first_name.' '.$user->last_name,

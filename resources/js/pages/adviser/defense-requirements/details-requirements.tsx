@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { csrfHeaders } from '@/lib/csrf';
 import { type BreadcrumbItem } from '@/types';
@@ -121,6 +122,7 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
         setRequest(requestProp);
     }, [requestProp]);
     const awaitingCorrections = isAwaitingCorrections(request.workflow_state);
+    const [rejectionReason, setRejectionReason] = useState('');
     const [confirm, setConfirm] = useState<{ open: boolean; action: 'approve' | 'reject' | 'retrieve' | null }>({
         open: false,
         action: null,
@@ -142,6 +144,10 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
 
     // --- Approve/Reject/Retrieve logic ---
     async function handleStatusChange(action: 'approve' | 'reject' | 'retrieve') {
+        if (action === 'reject' && rejectionReason.trim().length < 3) {
+            toast.error('Please explain the reason for rejection.');
+            return;
+        }
         if (!request.id || awaitingCorrections) return;
 
         // Restrict Endorse if required documents are missing
@@ -171,7 +177,8 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
         else if (action === 'retrieve') newAdviserStatus = 'Pending';
 
         try {
-            const payload: { adviser_status: string; coordinator_user_id?: number } = { adviser_status: newAdviserStatus };
+            const payload: { adviser_status: string; coordinator_user_id?: number; comment?: string } = { adviser_status: newAdviserStatus };
+            if (action === 'reject') payload.comment = rejectionReason.trim();
             // Only include coordinator_user_id when approving and a coordinator is available
             if (action === 'approve' && coordinators.length > 0 && coordinators[0].id) {
                 payload.coordinator_user_id = coordinators[0].id;
@@ -198,14 +205,22 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
                     }));
                 }
                 toast.success(`Adviser status set to ${newAdviserStatus}`);
+                setConfirm({ open: false, action: null });
+                setRejectionReason('');
             } else {
-                toast.error(data?.error || 'Failed to update adviser status');
+                toast.error(
+                    Object.values(data?.errors ?? {})
+                        .flat()
+                        .join(' ') ||
+                        data?.error ||
+                        data?.message ||
+                        'Failed to update adviser status',
+                );
             }
         } catch {
             toast.error('Network error updating adviser status');
         } finally {
             setIsLoading(false);
-            setConfirm({ open: false, action: null });
         }
     }
 
@@ -1050,6 +1065,24 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
                             </span>
                             ?
                         </p>
+                        {confirm.action === 'reject' && (
+                            <div className="space-y-2">
+                                <label htmlFor="adviser-rejection-reason" className="font-medium">
+                                    Reason for rejection (required)
+                                </label>
+                                <Textarea
+                                    id="adviser-rejection-reason"
+                                    value={rejectionReason}
+                                    onChange={(event) => setRejectionReason(event.target.value)}
+                                    placeholder="Explain why the request is rejected and what the student should address."
+                                    rows={4}
+                                    required
+                                    minLength={3}
+                                    maxLength={3000}
+                                />
+                                <p className="text-muted-foreground text-xs">This reason will be visible to the student in the request history.</p>
+                            </div>
+                        )}
                         {confirm.action === 'approve' && coordinators.length > 0 && (
                             <div className="text-muted-foreground text-xs">
                                 This will be sent to your coordinator: <span className="font-semibold">{coordinators[0].name}</span>
@@ -1070,7 +1103,10 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
                         <Button variant="ghost" onClick={() => setConfirm({ open: false, action: null })}>
                             Cancel
                         </Button>
-                        <Button onClick={() => confirm.action && handleStatusChange(confirm.action)} disabled={isLoading || awaitingCorrections}>
+                        <Button
+                            onClick={() => confirm.action && handleStatusChange(confirm.action)}
+                            disabled={isLoading || awaitingCorrections || (confirm.action === 'reject' && rejectionReason.trim().length < 3)}
+                        >
                             Confirm
                         </Button>
                     </div>
