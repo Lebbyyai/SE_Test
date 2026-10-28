@@ -138,7 +138,13 @@ export default function DefenseRegister() {
                     className="flex flex-wrap items-end gap-3 rounded-lg border p-4"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        filter.get('/defense-register', { preserveScroll: true });
+                        filter.clearErrors();
+                        const days = (Date.parse(filter.data.to) - Date.parse(filter.data.from)) / 86400000;
+                        if (!Number.isFinite(days) || days < 0 || days > 92) {
+                            filter.setError('to', 'Choose a range of no more than 93 days, with the end on or after the start.');
+                            return;
+                        }
+                        filter.get('/defense-register', { preserveScroll: true, preserveState: true });
                     }}
                 >
                     <label className="text-sm">
