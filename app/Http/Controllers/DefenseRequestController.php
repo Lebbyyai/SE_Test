@@ -1674,7 +1674,7 @@ class DefenseRequestController extends Controller
     public function downloadAttachment(string $filename, string $directory = 'defense-attachments')
     {
         abort_if(basename($filename) !== $filename || str_contains($filename, '\\'), 404);
-        abort_unless(in_array($directory, ['defense-attachments', 'defense_requirements'], true), 404);
+        abort_unless(in_array($directory, ['defense-attachments', 'defense_requirements', 'defense_documents', 'generated'], true), 404);
         $path = $directory.'/'.$filename;
         $query = DefenseRequest::query()->where(function ($q) use ($path) {
             foreach (['manuscript_proposal', 'similarity_index', 'avisee_adviser_attachment', 'proof_of_payment', 'rec_endorsement', 'advisers_endorsement', 'ai_detection_certificate', 'endorsement_form'] as $field) {
@@ -1683,7 +1683,7 @@ class DefenseRequestController extends Controller
         });
         $row = $query->firstOrFail();
         $this->assertCanRead($row);
-        $disk = Storage::disk($directory === 'defense_requirements' ? 'public' : 'local');
+        $disk = Storage::disk($directory === 'defense-attachments' ? 'local' : 'public');
         abort_unless($disk->exists($path), 404, 'This attachment is missing from this installation.');
         $mime = $disk->mimeType($path);
         if (in_array($mime, ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {

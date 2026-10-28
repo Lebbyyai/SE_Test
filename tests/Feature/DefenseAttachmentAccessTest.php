@@ -2,6 +2,7 @@
 
 use App\Models\DefenseRequest;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -59,4 +60,30 @@ test('missing physical file returns not found instead of a misleading permission
     [, , $adviser] = attachmentFixture();
     Storage::disk('public')->delete('defense_requirements/receipt.pdf');
     $this->actingAs($adviser)->get('/storage/defense_requirements/receipt.pdf')->assertNotFound();
+});
+
+test('adviser uploaded certificate and endorsement can be opened after submission', function () {
+    [$row, $student, $adviser] = attachmentFixture();
+    $pdf = "%PDF-1.4\nCertificate fixture";
+    $this->actingAs($adviser)->post('/adviser/defense-requirements/'.$row->id.'/documents', [
+        'ai_detection_certificate' => UploadedFile::fake()->createWithContent('certificate.pdf', $pdf),
+        'endorsement_form' => UploadedFile::fake()->createWithContent('endorsement.pdf', $pdf),
+    ], ['Accept' => 'application/json'])->assertOk();
+    $row->refresh();
+    foreach (['ai_detection_certificate', 'endorsement_form'] as $field) {
+        $url = $row->$field;
+        expect($url)->toStartWith('/storage/defense_documents/');
+        $this->actingAs($adviser)->get($url)->assertOk();
+        $this->actingAs($student)->get($url)->assertOk();
+        $this->actingAs(User::factory()->create(['role' => 'Adviser']))->get($url)->assertForbidden();
+    }
+});
+
+test('attached generated endorsements use the same ownership checks', function () {
+    [$row, $student, $adviser] = attachmentFixture();
+    Storage::disk('public')->put('generated/endorsement.pdf', "%PDF-1.4\nGenerated fixture");
+    $row->update(['endorsement_form' => 'generated/endorsement.pdf']);
+    $this->actingAs($adviser)->get('/storage/generated/endorsement.pdf')->assertOk();
+    $this->actingAs($student)->get('/storage/generated/endorsement.pdf')->assertOk();
+    $this->actingAs(User::factory()->create(['role' => 'Adviser']))->get('/storage/generated/endorsement.pdf')->assertForbidden();
 });
