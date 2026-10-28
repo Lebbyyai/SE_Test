@@ -1671,21 +1671,26 @@ class DefenseRequestController extends Controller
         });
     }
 
-    public function downloadAttachment(string $filename)
+    public function downloadAttachment(string $filename, string $directory = 'defense-attachments')
     {
-        abort_if(basename($filename) !== $filename, 404);
-        $path = 'defense-attachments/'.$filename;
+        abort_if(basename($filename) !== $filename || str_contains($filename, '\\'), 404);
+        abort_unless(in_array($directory, ['defense-attachments', 'defense_requirements'], true), 404);
+        $path = $directory.'/'.$filename;
         $query = DefenseRequest::query()->where(function ($q) use ($path) {
-            foreach (['manuscript_proposal', 'similarity_index', 'avisee_adviser_attachment', 'proof_of_payment', 'rec_endorsement'] as $field) {
-                $q->orWhere($field, $path);
+            foreach (['manuscript_proposal', 'similarity_index', 'avisee_adviser_attachment', 'proof_of_payment', 'rec_endorsement', 'advisers_endorsement', 'ai_detection_certificate', 'endorsement_form'] as $field) {
+                $q->orWhereIn($field, [$path, '/storage/'.$path, 'storage/'.$path]);
             }
         });
         $row = $query->firstOrFail();
         $this->assertCanRead($row);
-        $disk = Storage::disk('local');
-        abort_unless($disk->exists($path), 404);
+        $disk = Storage::disk($directory === 'defense_requirements' ? 'public' : 'local');
+        abort_unless($disk->exists($path), 404, 'This attachment is missing from this installation.');
+        $mime = $disk->mimeType($path);
+        if (in_array($mime, ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+            return $disk->response($path, basename($path), ['X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store'], 'inline');
+        }
 
-        return $disk->download($path);
+        return $disk->download($path, null, ['X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store']);
     }
 
     public function attachEndorsement(Request $request, DefenseRequest $defenseRequest)

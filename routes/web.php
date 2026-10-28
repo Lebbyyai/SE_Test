@@ -313,6 +313,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/api/defense-requests/count', [DefenseRequestController::class, 'count'])->name('api.defense-requests.count');
     Route::get('/api/defense-request/{defenseRequest}', [DefenseRequestController::class, 'apiShow'])->name('api.defense-request.show');
 
+    Route::get('/storage/defense_requirements/{filename}', [DefenseRequestController::class, 'downloadAttachment'])
+        ->defaults('directory', 'defense_requirements')->name('defense-requirements.attachment');
+
     /* Attachments download */
     Route::get(
         '/storage/defense-attachments/{filename}',

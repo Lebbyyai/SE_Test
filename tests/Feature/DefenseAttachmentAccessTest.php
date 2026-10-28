@@ -1,0 +1,62 @@
+<?php
+
+use App\Models\DefenseRequest;
+use App\Models\User;
+use Illuminate\Support\Facades\Storage;
+
+beforeEach(function () {
+    Storage::fake('public');
+    $this->withoutVite();
+});
+
+function attachmentFixture(): array
+{
+    $student = User::factory()->create(['role' => 'Student']);
+    $adviser = User::factory()->create(['role' => 'Adviser']);
+    $coordinator = User::factory()->create(['role' => 'Coordinator']);
+    $row = DefenseRequest::withoutEvents(fn () => DefenseRequest::create([
+        'submitted_by' => $student->id, 'adviser_user_id' => $adviser->id, 'coordinator_user_id' => $coordinator->id,
+        'first_name' => 'Attachment', 'last_name' => 'Student', 'school_id' => 'ATTACH-TEST',
+        'program' => 'Master of Arts', 'thesis_title' => 'Attachment test', 'defense_type' => 'Proposal',
+        'defense_adviser' => 'Adviser', 'workflow_state' => 'submitted', 'status' => 'Pending',
+        'proof_of_payment' => 'defense_requirements/receipt.pdf',
+    ]));
+    Storage::disk('public')->put('defense_requirements/receipt.pdf', "%PDF-1.4\nAttachment test");
+
+    return [$row, $student, $adviser, $coordinator];
+}
+
+test('assigned adviser student and coordinator can open the actual defense upload directory', function () {
+    [, $student, $adviser, $coordinator] = attachmentFixture();
+    foreach ([$student, $adviser, $coordinator] as $user) {
+        $this->actingAs($user)->get('/storage/defense_requirements/receipt.pdf')->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+    }
+});
+
+test('unrelated adviser and student cannot read another defense attachment', function () {
+    attachmentFixture();
+    foreach (['Adviser', 'Student', 'Coordinator'] as $role) {
+        $this->actingAs(User::factory()->create(['role' => $role]))
+            ->get('/storage/defense_requirements/receipt.pdf')->assertForbidden();
+    }
+});
+
+test('guest cannot read a defense attachment', function () {
+    attachmentFixture();
+    $this->get('/storage/defense_requirements/receipt.pdf')->assertRedirect('/login');
+});
+
+test('old storage prefixes resolve but files not attached to any request do not', function () {
+    [$row, , $adviser] = attachmentFixture();
+    $row->update(['proof_of_payment' => '/storage/defense_requirements/receipt.pdf']);
+    $this->actingAs($adviser)->get('/storage/defense_requirements/receipt.pdf')->assertOk();
+    Storage::disk('public')->put('defense_requirements/unreferenced.pdf', 'Private file');
+    $this->get('/storage/defense_requirements/unreferenced.pdf')->assertNotFound();
+});
+
+test('missing physical file returns not found instead of a misleading permission error', function () {
+    [, , $adviser] = attachmentFixture();
+    Storage::disk('public')->delete('defense_requirements/receipt.pdf');
+    $this->actingAs($adviser)->get('/storage/defense_requirements/receipt.pdf')->assertNotFound();
+});
