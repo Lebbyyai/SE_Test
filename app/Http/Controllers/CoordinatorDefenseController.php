@@ -529,7 +529,12 @@ class CoordinatorDefenseController extends Controller
                 : date('Y-m-d H:i:s', strtotime($r->adviser_reviewed_at)))
             : '—';
 
+        $adviser = $r->adviserUser;
+
         return [
+            'adviser_profile' => $adviser ? ['id' => $adviser->id, 'name' => $adviser->name, 'email' => $adviser->email] : null,
+            'adviser_status' => $r->adviser_status,
+            'coordinator_status' => $r->coordinator_status,
             'id' => $r->id,
             'first_name' => $r->first_name,
             'middle_name' => $r->middle_name,
@@ -686,7 +691,12 @@ class CoordinatorDefenseController extends Controller
     {
         $r->attemptAutoComplete(); // lazy auto-complete for coordinator view
 
+        $adviser = $r->adviserUser;
+
         return [
+            'adviser_profile' => $adviser ? ['id' => $adviser->id, 'name' => $adviser->name, 'email' => $adviser->email] : null,
+            'adviser_status' => $r->adviser_status,
+            'coordinator_status' => $r->coordinator_status,
             'id' => $r->id,
             'first_name' => $r->first_name,
             'middle_name' => $r->middle_name,

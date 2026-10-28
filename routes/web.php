@@ -420,7 +420,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 abort(403);
             }
 
+            if ($user->role === 'Coordinator') {
+                abort_unless((int) $defenseRequest->coordinator_user_id === (int) $user->id, 403);
+            }
+            $adviser = $defenseRequest->adviserUser;
             $mapped = [
+                'adviser_profile' => $adviser ? ['id' => $adviser->id, 'name' => $adviser->name, 'email' => $adviser->email] : null,
                 'id' => $defenseRequest->id,
                 'first_name' => $defenseRequest->first_name,
                 'middle_name' => $defenseRequest->middle_name,

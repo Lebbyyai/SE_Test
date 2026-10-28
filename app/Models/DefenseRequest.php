@@ -38,6 +38,12 @@ class DefenseRequest extends Model
         return $this->belongsTo(User::class, 'submitted_by');
     }
 
+    public function getDefenseAdviserAttribute($value): ?string
+    {
+        // Keep the original submission value in storage, but show the linked account's current name.
+        return $this->adviser_user_id && $this->adviserUser ? $this->adviserUser->name : $value;
+    }
+
     public function adviserUser()
     {
         return $this->belongsTo(User::class, 'adviser_user_id');

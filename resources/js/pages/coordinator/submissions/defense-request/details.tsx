@@ -64,6 +64,7 @@ export type DefenseRequestFull = CorrectionDetails & {
     priority?: 'Low' | 'Medium' | 'High';
     workflow_state?: string;
     defense_adviser?: string;
+    adviser_profile?: { id: number; name: string; email: string } | null;
     defense_chairperson?: string;
     defense_panelist1?: string;
     defense_panelist2?: string;
@@ -872,7 +873,17 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                                         };
 
                                         const rows = [
-                                            { key: 'adviser', info: memberFor(request.defense_adviser, 'Adviser') },
+                                            {
+                                                key: 'adviser',
+                                                info: request.adviser_profile
+                                                    ? {
+                                                          displayName: request.adviser_profile.name,
+                                                          email: request.adviser_profile.email,
+                                                          rawValue: String(request.adviser_profile.id),
+                                                          role: 'Adviser',
+                                                      }
+                                                    : memberFor(request.defense_adviser, 'Adviser'),
+                                            },
                                             {
                                                 key: 'defense_chairperson',
                                                 info: memberFor(panels.defense_chairperson || request.defense_chairperson, 'Panel Chair'),
@@ -896,7 +907,24 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                                         ].map((r) => {
                                             const namePresent = !!(r.info.rawValue || (r.info.displayName && r.info.displayName !== '—'));
                                             const emailPresent = !!r.info.email;
-                                            const status = namePresent ? (emailPresent ? 'Assigned' : 'Pending confirmation') : '—';
+                                            const adviserEndorsed =
+                                                r.key === 'adviser' &&
+                                                (request.adviser_status === 'Approved' ||
+                                                    [
+                                                        'adviser-approved',
+                                                        'coordinator-review',
+                                                        'coordinator-approved',
+                                                        'panels-assigned',
+                                                        'scheduled',
+                                                        'completed',
+                                                    ].includes(request.workflow_state || ''));
+                                            const status = adviserEndorsed
+                                                ? 'Endorsed'
+                                                : namePresent
+                                                  ? emailPresent
+                                                      ? 'Assigned'
+                                                      : 'Email unavailable'
+                                                  : '\u2014';
 
                                             const receivable = namePresent
                                                 ? request.program_level
@@ -947,7 +975,7 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                                                                         className={
                                                                             r.status === 'Assigned'
                                                                                 ? 'bg-green-100 text-green-700'
-                                                                                : r.status === 'Pending confirmation'
+                                                                                : r.status === 'Email unavailable'
                                                                                   ? 'bg-yellow-100 text-amber-700'
                                                                                   : 'bg-amber-100 text-amber-700'
                                                                         }
