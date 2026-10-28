@@ -694,6 +694,7 @@ class CoordinatorDefenseController extends Controller
         $adviser = $r->adviserUser;
 
         return [
+            'attachment_names' => $r->attachment_names,
             'adviser_profile' => $adviser ? ['id' => $adviser->id, 'name' => $adviser->name, 'email' => $adviser->email] : null,
             'adviser_status' => $r->adviser_status,
             'coordinator_status' => $r->coordinator_status,

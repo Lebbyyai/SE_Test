@@ -77,6 +77,7 @@ type DefenseRequirement = DefenseProgressFields & {
     status: string;
     reference_no?: string;
     program: string;
+    attachment_names?: Record<string, string>;
     defense_type?: string;
     created_at?: string;
     workflow_state?: string;
@@ -695,7 +696,8 @@ export default function DefenseRequestIndex() {
                                                                             >
                                                                                 <Paperclip className="h-3.5 w-3.5" />
                                                                                 <span className="max-w-[160px] truncate">
-                                                                                    Manuscript • {req.manuscript_proposal.split('/').pop()}
+                                                                                    Manuscript •{' '}
+                                                                                    {req.attachment_names?.manuscript_proposal || 'Document'}
                                                                                 </span>
                                                                             </a>
                                                                         )}
@@ -709,7 +711,8 @@ export default function DefenseRequestIndex() {
                                                                             >
                                                                                 <Paperclip className="h-3.5 w-3.5" />
                                                                                 <span className="max-w-[160px] truncate">
-                                                                                    Similarity • {req.similarity_index.split('/').pop()}
+                                                                                    Similarity •{' '}
+                                                                                    {req.attachment_names?.similarity_index || 'Document'}
                                                                                 </span>
                                                                             </a>
                                                                         )}
@@ -723,7 +726,8 @@ export default function DefenseRequestIndex() {
                                                                             >
                                                                                 <Paperclip className="h-3.5 w-3.5" />
                                                                                 <span className="max-w-[160px] truncate">
-                                                                                    Endorsement • {req.rec_endorsement.split('/').pop()}
+                                                                                    Endorsement •{' '}
+                                                                                    {req.attachment_names?.rec_endorsement || 'Document'}
                                                                                 </span>
                                                                             </a>
                                                                         )}
@@ -737,7 +741,7 @@ export default function DefenseRequestIndex() {
                                                                             >
                                                                                 <Paperclip className="h-3.5 w-3.5" />
                                                                                 <span className="max-w-[160px] truncate">
-                                                                                    Payment • {req.proof_of_payment.split('/').pop()}
+                                                                                    Payment • {req.attachment_names?.proof_of_payment || 'Document'}
                                                                                 </span>
                                                                             </a>
                                                                         )}
@@ -751,7 +755,8 @@ export default function DefenseRequestIndex() {
                                                                             >
                                                                                 <Paperclip className="h-3.5 w-3.5" />
                                                                                 <span className="max-w-[160px] truncate">
-                                                                                    Avisee–Adviser • {req.avisee_adviser_attachment.split('/').pop()}
+                                                                                    Avisee–Adviser •{' '}
+                                                                                    {req.attachment_names?.avisee_adviser_attachment || 'Document'}
                                                                                 </span>
                                                                             </a>
                                                                         )}

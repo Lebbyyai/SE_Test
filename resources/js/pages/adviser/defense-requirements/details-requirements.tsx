@@ -29,6 +29,7 @@ type DefenseRequestFull = CorrectionDetails & {
     priority?: 'Low' | 'Medium' | 'High';
     workflow_state?: string;
     defense_adviser?: string;
+    attachment_names?: Record<string, string>;
     advisers_endorsement?: string;
     rec_endorsement?: string;
     proof_of_payment?: string;
@@ -239,13 +240,37 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
 
     // Attachments
     const attachments = [
-        { label: 'Adviser’s Endorsement', url: resolveFileUrl(request.advisers_endorsement) },
-        { label: 'REC Endorsement', url: resolveFileUrl(request.rec_endorsement) },
-        { label: 'Proof of Payment', url: resolveFileUrl(request.proof_of_payment) },
-        { label: 'Reference No.', url: request.reference_no }, // Not a file, keep as is
-        { label: 'Manuscript', url: resolveFileUrl(request.manuscript_proposal) },
-        { label: 'Similarity Index', url: resolveFileUrl(request.similarity_index) },
-        { label: 'Avisee-Adviser File', url: resolveFileUrl(request.avisee_adviser_attachment) },
+        {
+            label: 'Adviser’s Endorsement',
+            name: request.attachment_names?.advisers_endorsement || 'Adviser’s Endorsement',
+            url: resolveFileUrl(request.advisers_endorsement),
+        },
+        {
+            label: 'REC Endorsement',
+            name: request.attachment_names?.rec_endorsement || 'REC Endorsement',
+            url: resolveFileUrl(request.rec_endorsement),
+        },
+        {
+            label: 'Proof of Payment',
+            name: request.attachment_names?.proof_of_payment || 'Proof of Payment',
+            url: resolveFileUrl(request.proof_of_payment),
+        },
+        { label: 'Reference No.', name: request.reference_no, url: request.reference_no }, // Not a file, keep as is
+        {
+            label: 'Manuscript',
+            name: request.attachment_names?.manuscript_proposal || 'Manuscript',
+            url: resolveFileUrl(request.manuscript_proposal),
+        },
+        {
+            label: 'Similarity Index',
+            name: request.attachment_names?.similarity_index || 'Similarity Index',
+            url: resolveFileUrl(request.similarity_index),
+        },
+        {
+            label: 'Avisee-Adviser File',
+            name: request.attachment_names?.avisee_adviser_attachment || 'Avisee-Adviser File',
+            url: resolveFileUrl(request.avisee_adviser_attachment),
+        },
     ];
 
     // --- FINAL CONSISTENT WORKFLOW STEPS AND MAPPING ---
@@ -351,6 +376,7 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
             if (res.ok) {
                 setRequest((r) => ({
                     ...r,
+                    attachment_names: data.attachment_names || r.attachment_names,
                     ai_detection_certificate: data.ai_detection_certificate || r.ai_detection_certificate,
                     endorsement_form: data.endorsement_form || r.endorsement_form,
                     advisers_endorsement: data.advisers_endorsement || r.advisers_endorsement,
@@ -705,9 +731,7 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
                                                         <FileText className="h-4 w-4" />
                                                         <span className="font-medium">{a.label}</span>
                                                         <span className="text-muted-foreground ml-auto max-w-[180px] truncate text-xs">
-                                                            {typeof a.url === 'string' && a.label !== 'Reference No.'
-                                                                ? a.url.split('/').pop()
-                                                                : a.url || ''}
+                                                            {typeof a.url === 'string' && a.label !== 'Reference No.' ? a.name : a.url || ''}
                                                         </span>
                                                     </a>
                                                 ) : null,
@@ -723,7 +747,7 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
                                                     rel="noopener noreferrer"
                                                     className="ml-auto max-w-[180px] truncate text-xs underline"
                                                 >
-                                                    {request.ai_detection_certificate.split('/').pop()}
+                                                    {request.attachment_names?.ai_detection_certificate || 'AI Detection Certificate'}
                                                 </a>
                                             ) : (
                                                 <span className="ml-auto text-xs font-semibold text-rose-600">Missing</span>
@@ -740,7 +764,7 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
                                                     rel="noopener noreferrer"
                                                     className="ml-auto max-w-[180px] truncate text-xs underline"
                                                 >
-                                                    {request.endorsement_form.split('/').pop()}
+                                                    {request.attachment_names?.endorsement_form || 'Endorsement Form'}
                                                 </a>
                                             ) : (
                                                 <span className="ml-auto text-xs font-semibold text-rose-600">Missing</span>
@@ -789,7 +813,7 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
                                                     <div className="flex w-full items-center gap-2">
                                                         <Input
                                                             type="text"
-                                                            value={request.ai_detection_certificate.split('/').pop() || ''}
+                                                            value={request.attachment_names?.ai_detection_certificate || 'AI Detection Certificate'}
                                                             disabled
                                                             className="flex-1 cursor-default bg-zinc-100 text-zinc-700"
                                                         />
@@ -849,7 +873,7 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
                                                     <div className="flex w-full items-center gap-2">
                                                         <Input
                                                             type="text"
-                                                            value={request.endorsement_form.split('/').pop() || ''}
+                                                            value={request.attachment_names?.endorsement_form || 'Endorsement Form'}
                                                             disabled
                                                             className="flex-1 cursor-default bg-zinc-100 text-zinc-700"
                                                         />

@@ -40,6 +40,7 @@ beforeEach(function () {
         $table->timestamps();
     });
     (require database_path('migrations/2026_10_23_000004_add_defense_corrections.php'))->up();
+    (require database_path('migrations/2026_10_28_000002_add_defense_attachment_original_names.php'))->up();
     (require glob(database_path('migrations/*create_notifications_table.php'))[0])->up();
     (require database_path('migrations/2026_10_23_000003_add_notification_event_tracking.php'))->up();
     foreach (['Student', 'Adviser', 'Coordinator', 'Student', 'Adviser', 'Coordinator', 'Dean'] as $index => $role) {

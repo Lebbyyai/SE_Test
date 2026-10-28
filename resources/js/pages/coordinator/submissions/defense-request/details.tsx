@@ -64,6 +64,7 @@ export type DefenseRequestFull = CorrectionDetails & {
     priority?: 'Low' | 'Medium' | 'High';
     workflow_state?: string;
     defense_adviser?: string;
+    attachment_names?: Record<string, string>;
     adviser_profile?: { id: number; name: string; email: string } | null;
     defense_chairperson?: string;
     defense_panelist1?: string;
@@ -570,14 +571,46 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
 
     // Attachments (show all, including manuscript, similarity, avisee, etc.)
     const attachments = [
-        { label: 'Adviser’s Endorsement', url: resolveFileUrl(request.advisers_endorsement) },
-        { label: 'REC Endorsement', url: resolveFileUrl(request.rec_endorsement) },
-        { label: 'Proof of Payment', url: resolveFileUrl(request.proof_of_payment) },
-        { label: 'Manuscript', url: resolveFileUrl(request.manuscript_proposal) },
-        { label: 'Similarity Index', url: resolveFileUrl(request.similarity_index) },
-        { label: 'Avisee-Adviser File', url: resolveFileUrl(request.avisee_adviser_attachment) },
-        { label: 'AI Detection Certificate', url: resolveFileUrl(request.ai_detection_certificate) },
-        { label: 'Endorsement Form', url: resolveFileUrl(request.endorsement_form) },
+        {
+            label: 'Adviser’s Endorsement',
+            name: request.attachment_names?.advisers_endorsement || 'Adviser’s Endorsement',
+            url: resolveFileUrl(request.advisers_endorsement),
+        },
+        {
+            label: 'REC Endorsement',
+            name: request.attachment_names?.rec_endorsement || 'REC Endorsement',
+            url: resolveFileUrl(request.rec_endorsement),
+        },
+        {
+            label: 'Proof of Payment',
+            name: request.attachment_names?.proof_of_payment || 'Proof of Payment',
+            url: resolveFileUrl(request.proof_of_payment),
+        },
+        {
+            label: 'Manuscript',
+            name: request.attachment_names?.manuscript_proposal || 'Manuscript',
+            url: resolveFileUrl(request.manuscript_proposal),
+        },
+        {
+            label: 'Similarity Index',
+            name: request.attachment_names?.similarity_index || 'Similarity Index',
+            url: resolveFileUrl(request.similarity_index),
+        },
+        {
+            label: 'Avisee-Adviser File',
+            name: request.attachment_names?.avisee_adviser_attachment || 'Avisee-Adviser File',
+            url: resolveFileUrl(request.avisee_adviser_attachment),
+        },
+        {
+            label: 'AI Detection Certificate',
+            name: request.attachment_names?.ai_detection_certificate || 'AI Detection Certificate',
+            url: resolveFileUrl(request.ai_detection_certificate),
+        },
+        {
+            label: 'Endorsement Form',
+            name: request.attachment_names?.endorsement_form || 'Endorsement Form',
+            url: resolveFileUrl(request.endorsement_form),
+        },
     ];
 
     // Helper for workflow history rendering robustness
@@ -1015,9 +1048,7 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                                                 >
                                                     <FileText className="h-4 w-4" />
                                                     <span className="font-medium">{a.label}</span>
-                                                    <span className="text-muted-foreground ml-auto max-w-[180px] truncate text-xs">
-                                                        {a.url?.split('/').pop()}
-                                                    </span>
+                                                    <span className="text-muted-foreground ml-auto max-w-[180px] truncate text-xs">{a.name}</span>
                                                 </a>
                                             ))}
                                         {/* Reference No. as plain text if present */}

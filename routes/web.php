@@ -425,6 +425,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             }
             $adviser = $defenseRequest->adviserUser;
             $mapped = [
+                'attachment_names' => $defenseRequest->attachment_names,
                 'adviser_profile' => $adviser ? ['id' => $adviser->id, 'name' => $adviser->name, 'email' => $adviser->email] : null,
                 'id' => $defenseRequest->id,
                 'first_name' => $defenseRequest->first_name,

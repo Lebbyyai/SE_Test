@@ -27,6 +27,7 @@ class DefenseRequirementController extends Controller
             'defenseRequirements' => $requirements->map(function ($r) {
                 return [
                     'id' => $r->id,
+                    'attachment_names' => $r->attachment_names,
                     'first_name' => $r->first_name,
                     'middle_name' => $r->middle_name,
                     'last_name' => $r->last_name,
@@ -67,6 +68,7 @@ class DefenseRequirementController extends Controller
             }),
             'defenseRequest' => $defenseRequest ? [
                 'id' => $defenseRequest->id,
+                'attachment_names' => $defenseRequest->attachment_names,
                 'first_name' => $defenseRequest->first_name,
                 'middle_name' => $defenseRequest->middle_name,
                 'last_name' => $defenseRequest->last_name,
@@ -233,6 +235,7 @@ class DefenseRequirementController extends Controller
                         'user' => Auth::id(),
                     ]);
                     $data[$f] = $uploaded->store('defense_requirements', 'public');
+                    $data['attachment_original_names'][$f] = DefenseRequest::cleanAttachmentName($uploaded->getClientOriginalName());
                 } catch (\Throwable $e) {
                     Log::error('Upload failed', ['field' => $f, 'err' => $e->getMessage()]);
 
@@ -243,6 +246,7 @@ class DefenseRequirementController extends Controller
 
         try {
             $defenseRequestData = [
+                'attachment_original_names' => $data['attachment_original_names'] ?? [],
                 'first_name' => $data['first_name'],
                 'middle_name' => $data['middle_name'] ?? null,
                 'last_name' => $data['last_name'],

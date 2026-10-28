@@ -226,12 +226,14 @@ class DefenseRequestController extends Controller
         foreach (['advisersEndorsement', 'recEndorsement', 'proofOfPayment'] as $f) {
             if ($request->hasFile($f)) {
                 $data[$f] = $request->file($f)->store('defense-attachments');
+                $data['attachment_original_names'][$f] = DefenseRequest::cleanAttachmentName($request->file($f)->getClientOriginalName());
             }
         }
 
         try {
             DB::beginTransaction();
             $defenseRequest = DefenseRequest::create([
+                'attachment_original_names' => $data['attachment_original_names'] ?? [],
                 'first_name' => $data['firstName'],
                 'middle_name' => $data['middleName'],
                 'last_name' => $data['lastName'],
@@ -694,6 +696,7 @@ class DefenseRequestController extends Controller
             'reference_no' => $defenseRequest->reference_no,
             // If you want to send attachments as well:
             'attachments' => $defenseRequest->attachments,
+            'attachment_names' => $defenseRequest->attachment_names,
         ]);
     }
 
@@ -1309,14 +1312,18 @@ class DefenseRequestController extends Controller
             $path = $file->store('defense_documents', 'public');
             $defenseRequest->ai_detection_certificate = '/storage/'.$path;
             $data['ai_detection_certificate'] = $defenseRequest->ai_detection_certificate;
+            $defenseRequest->attachment_original_names = array_merge($defenseRequest->attachment_original_names ?? [], ['ai_detection_certificate' => DefenseRequest::cleanAttachmentName($file->getClientOriginalName())]);
         }
         if ($request->hasFile('endorsement_form')) {
             $file = $request->file('endorsement_form');
             $path = $file->store('defense_documents', 'public');
             $defenseRequest->endorsement_form = '/storage/'.$path;
             $data['endorsement_form'] = $defenseRequest->endorsement_form;
+            $defenseRequest->attachment_original_names = array_merge($defenseRequest->attachment_original_names ?? [], ['endorsement_form' => DefenseRequest::cleanAttachmentName($file->getClientOriginalName())]);
         }
         $defenseRequest->save();
+
+        $data['attachment_names'] = $defenseRequest->attachment_names;
 
         return response()->json($data);
     }
@@ -1685,12 +1692,19 @@ class DefenseRequestController extends Controller
         $this->assertCanRead($row);
         $disk = Storage::disk($directory === 'defense-attachments' ? 'local' : 'public');
         abort_unless($disk->exists($path), 404, 'This attachment is missing from this installation.');
+        $displayName = basename($path);
+        foreach (DefenseRequest::ATTACHMENT_LABELS as $field => $label) {
+            if (ltrim(preg_replace('#^/?storage/#', '', (string) $row->{$field}), '/') === $path) {
+                $displayName = $row->attachment_names[$field];
+                break;
+            }
+        }
         $mime = $disk->mimeType($path);
         if (in_array($mime, ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
-            return $disk->response($path, basename($path), ['X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store'], 'inline');
+            return $disk->response($path, $displayName, ['X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store'], 'inline');
         }
 
-        return $disk->download($path, null, ['X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store']);
+        return $disk->download($path, $displayName, ['X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, no-store']);
     }
 
     public function attachEndorsement(Request $request, DefenseRequest $defenseRequest)

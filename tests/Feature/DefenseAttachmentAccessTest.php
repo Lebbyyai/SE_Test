@@ -3,6 +3,7 @@
 use App\Models\DefenseRequest;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -117,4 +118,59 @@ test('already saved correction files using the historical hyphen directory remai
     $this->actingAs($adviser)->get($url)->assertOk();
     $this->actingAs($student)->get($url)->assertOk();
     $this->actingAs(User::factory()->create(['role' => 'Student']))->get($url)->assertForbidden();
+});
+
+test('adviser upload retains the original document name for display and download', function () {
+    [$row, , $adviser] = attachmentFixture();
+    $this->actingAs($adviser)->post('/adviser/defense-requirements/'.$row->id.'/documents', [
+        'endorsement_form' => UploadedFile::fake()->create('Proposal Endorsement.docx', 10, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+    ], ['Accept' => 'application/json'])->assertOk();
+    $row->refresh();
+    expect($row->attachment_names['endorsement_form'])->toBe('Proposal Endorsement.docx');
+    expect(basename($row->endorsement_form))->not->toBe('Proposal Endorsement.docx');
+    $response = $this->get($row->endorsement_form)->assertOk();
+    expect($response->headers->get('Content-Disposition'))->toContain('Proposal Endorsement.docx');
+});
+
+test('correction replacement updates its original name while preserving the previous name in history', function () {
+    [$row, $student, $adviser] = attachmentFixture();
+    $row->update(['workflow_state' => 'adviser-corrections', 'manuscript_proposal' => 'defense_requirements/old.pdf',
+        'attachment_original_names' => ['manuscript_proposal' => 'First Manuscript.pdf']]);
+    $this->actingAs($student)->post('/defense-requirements/'.$row->id.'/resubmit', [
+        'student_response' => 'Replaced the manuscript',
+        'manuscript_proposal' => UploadedFile::fake()->createWithContent('Revised Manuscript.pdf', "%PDF-1.4\nOriginal name fixture"),
+    ], ['Accept' => 'application/json'])->assertOk();
+    $row->refresh();
+    expect($row->attachment_names['manuscript_proposal'])->toBe('Revised Manuscript.pdf');
+    $history = $row->workflow_history;
+    $change = $history[array_key_last($history)]['attachments']['manuscript_proposal'];
+    expect($change['previous_name'])->toBe('First Manuscript.pdf')->and($change['current_name'])->toBe('Revised Manuscript.pdf');
+    $response = $this->actingAs($adviser)->get('/storage/'.$row->manuscript_proposal)->assertOk();
+    expect($response->headers->get('Content-Disposition'))->toContain('Revised Manuscript.pdf');
+});
+
+test('older attachment uses a readable fallback filename instead of its storage identifier', function () {
+    [$row, , $adviser] = attachmentFixture();
+    $response = $this->actingAs($adviser)->get('/storage/defense_requirements/receipt.pdf')->assertOk();
+    expect($response->headers->get('Content-Disposition'))->toContain('Proof of Payment - Attachment test.pdf');
+    expect($row->fresh()->attachment_names['proof_of_payment'])->toBe('Proof of Payment - Attachment test.pdf');
+});
+
+test('initial student submission records original filenames alongside randomized storage paths', function () {
+    $student = User::factory()->create(['role' => 'Student', 'program' => 'Master of Arts', 'school_id' => 'NAME-TEST']);
+    $adviser = User::factory()->create(['role' => 'Adviser']);
+    $student->advisers()->attach($adviser->id, ['status' => 'accepted']);
+    Mail::fake();
+    $data = ['first_name' => $student->first_name, 'last_name' => $student->last_name,
+        'school_id' => $student->school_id, 'program' => $student->program, 'thesis_title' => 'Original names fixture',
+        'adviser_id' => $adviser->id, 'adviser' => $adviser->name, 'defense_type' => 'Proposal',
+        'amount' => 100, 'reference_no' => 'TEST-OR-NAMES'];
+    foreach (['manuscript_proposal', 'similarity_index', 'proof_of_payment', 'avisee_adviser_attachment'] as $field) {
+        $data[$field] = UploadedFile::fake()->createWithContent($field.' Original.pdf', "%PDF-1.4\nInitial name fixture");
+    }
+    $this->actingAs($student)->post('/defense-requirements', $data)->assertSessionHasNoErrors();
+    $row = DefenseRequest::where('submitted_by', $student->id)->firstOrFail();
+    expect($row->attachment_original_names['manuscript_proposal'])->toBe('manuscript_proposal Original.pdf');
+    $this->get('/student/documents')->assertInertia(fn ($page) => $page
+        ->where('files.0.filename', 'manuscript_proposal Original.pdf'));
 });

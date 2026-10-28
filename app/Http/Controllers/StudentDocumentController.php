@@ -41,7 +41,7 @@ class StudentDocumentController extends Controller
                         'defense_type' => $req->defense_type,
                         'field' => $field,
                         'label' => $label,
-                        'filename' => basename($path),
+                        'filename' => $req->attachment_names[$field],
                         'path' => $path,
                         'url' => $disk->url($path),
                         'size' => $size,

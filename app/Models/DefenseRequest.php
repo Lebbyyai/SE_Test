@@ -12,11 +12,46 @@ use Illuminate\Support\Facades\Log;
 class DefenseRequest extends Model
 {
     protected $guarded = [];
+
+    protected $appends = ['attachment_names'];
+
+    public const ATTACHMENT_LABELS = [
+        'manuscript_proposal' => 'Manuscript', 'similarity_index' => 'Similarity Index',
+        'avisee_adviser_attachment' => 'Advisee-Adviser Attachment', 'proof_of_payment' => 'Proof of Payment',
+        'rec_endorsement' => 'REC Endorsement', 'advisers_endorsement' => 'Adviser Endorsement',
+        'ai_detection_certificate' => 'AI Detection Certificate', 'endorsement_form' => 'Endorsement Form',
+    ];
+
+    public static function cleanAttachmentName(string $name): string
+    {
+        return trim(preg_replace('/[\x00-\x1F\x7F]/u', '', basename(str_replace('\\', '/', $name))) ?? '');
+    }
+
+    public function getAttachmentNamesAttribute(): array
+    {
+        $original = $this->attachment_original_names ?? [];
+        $result = [];
+        foreach (self::ATTACHMENT_LABELS as $field => $label) {
+            if (! $this->{$field}) {
+                continue;
+            }
+            $name = self::cleanAttachmentName((string) ($original[$field] ?? ''));
+            if ($name === '') {
+                $extension = pathinfo((string) $this->{$field}, PATHINFO_EXTENSION);
+                $name = self::cleanAttachmentName($label.' - '.mb_substr($this->thesis_title ?: 'Defense request', 0, 80).($extension ? '.'.$extension : ''));
+            }
+            $result[$field] = $name;
+        }
+
+        return $result;
+    }
+
     // If you use $fillable, add:
     // protected $fillable = [..., 'ai_detection_certificate', 'endorsement_form'];
 
     protected $casts = [
         'panel_affiliations' => 'array',
+        'attachment_original_names' => 'array',
         'correction_requested_at' => 'datetime',
         'correction_count' => 'integer',
         'workflow_history' => 'array',

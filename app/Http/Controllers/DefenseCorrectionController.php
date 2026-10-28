@@ -71,7 +71,10 @@ class DefenseCorrectionController extends Controller
                         throw new \RuntimeException('Unable to store the replacement file.');
                     }
                     $stored[] = $path;
-                    $changes[$field] = ['previous' => $dr->{$field}, 'current' => $path];
+                    $previousName = $dr->attachment_names[$field] ?? null;
+                    $name = DefenseRequest::cleanAttachmentName($request->file($field)->getClientOriginalName());
+                    $dr->attachment_original_names = array_merge($dr->attachment_original_names ?? [], [$field => $name]);
+                    $changes[$field] = ['previous' => $dr->{$field}, 'current' => $path, 'previous_name' => $previousName, 'current_name' => $name];
                     $dr->{$field} = $path;
                 }
                 $oldTitle = $dr->thesis_title;
