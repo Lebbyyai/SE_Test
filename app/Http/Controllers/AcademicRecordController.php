@@ -17,9 +17,16 @@ class AcademicRecordController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
+        if (app()->environment(['local', 'testing']) && $user->is_demo_account) {
+            return response()->json([
+                'available' => false,
+                'message' => 'Academic records are unavailable for local demo accounts. They are not connected to the school portal. Grades, document clearance, and tuition clearance remain unverified.',
+            ]);
+        }
+
         $session = Cache::get('legacy_session_'.$user->id);
         if (! $session) {
-            return response()->json(['error' => 'Legacy session missing. Re-login required.'], 440);
+            return response()->json(['error' => 'The school-portal session is unavailable. Sign in again using your school-portal credentials to load academic records.'], 440);
         }
 
         $semesterIdOverride = $request->query('semester_id');

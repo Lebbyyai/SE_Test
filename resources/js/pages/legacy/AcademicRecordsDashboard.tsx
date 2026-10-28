@@ -36,6 +36,7 @@ interface ParsedData {
 const AcademicRecordsDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
     const [data, setData] = useState<ParsedData | null>(null);
 
     const [semesterId, setSemesterId] = useState<string | undefined>(undefined);
@@ -47,11 +48,17 @@ const AcademicRecordsDashboard: React.FC = () => {
     const load = useCallback(() => {
         setLoading(true);
         setError(null);
+        setNotice(null);
+        setData(null);
         const url = '/legacy/academic-records' + (semesterId ? `?semester_id=${semesterId}` : '');
         fetch(url, { headers: { Accept: 'application/json' } })
             .then(async (r) => {
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                const json = await r.json();
+                const json = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(json.error || `Unable to load academic records (HTTP ${r.status}).`);
+                if (json.available === false) {
+                    setNotice(json.message);
+                    return;
+                }
                 setData(json.data as ParsedData);
             })
             .catch((e) => setError(e.message))
@@ -129,7 +136,7 @@ const AcademicRecordsDashboard: React.FC = () => {
                                 onClick={handlePrint}
                                 className="flex items-center gap-2 rounded border px-3 py-2"
                                 title="Print Table"
-                                disabled={loading}
+                                disabled={loading || !data}
                             >
                                 <Printer size={18} />
                             </button>
@@ -139,8 +146,17 @@ const AcademicRecordsDashboard: React.FC = () => {
                     {/* Error */}
                     {error && (
                         <Card className="mb-4 rounded-xl border shadow-none">
-                            <CardContent className="bg-red-50 text-red-700">
-                                Failed to load: {error} — try logging out/in if session expired.
+                            <CardContent className="bg-red-50 py-4 text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</CardContent>
+                        </Card>
+                    )}
+
+                    {notice && (
+                        <Card className="mb-4 rounded-xl border shadow-none">
+                            <CardHeader>
+                                <CardTitle>Academic records unavailable</CardTitle>
+                            </CardHeader>
+                            <CardContent role="status" className="text-muted-foreground">
+                                {notice}
                             </CardContent>
                         </Card>
                     )}
