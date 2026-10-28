@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import { csrfHeaders } from '@/lib/csrf';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -59,11 +60,8 @@ export default function HonorariumLedger() {
         try {
             const result = await fetch(url, {
                 method,
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '',
-                },
+                credentials: 'same-origin',
+                headers: csrfHeaders(true),
                 body: JSON.stringify(data),
             });
             const body = await result.json().catch(() => ({}));

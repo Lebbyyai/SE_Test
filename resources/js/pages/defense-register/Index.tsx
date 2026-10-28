@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import { csrfHeaders } from '@/lib/csrf';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -77,11 +78,8 @@ export default function DefenseRegister() {
         try {
             const response = await fetch(`/defense-register/${selected.id}/${classify ? 'panel-types' : 'confirm-service'}`, {
                 method: classify ? 'PATCH' : 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '',
-                },
+                credentials: 'same-origin',
+                headers: csrfHeaders(true),
                 body: JSON.stringify({
                     notes,
                     held,

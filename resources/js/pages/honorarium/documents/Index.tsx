@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { csrfHeaders } from '@/lib/csrf';
 import { Head, router, usePage } from '@inertiajs/react';
 import { CalendarDays, CheckCircle2, Clock3, FileCheck2, FileText, Send, XCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -84,11 +85,8 @@ export default function FinanceDocumentsPage() {
         try {
             const response = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '',
-                },
+                credentials: 'same-origin',
+                headers: csrfHeaders(true),
                 body: JSON.stringify(payload),
             });
             const data = await response.json().catch(() => ({}));
