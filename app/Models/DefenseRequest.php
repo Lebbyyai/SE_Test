@@ -27,6 +27,7 @@ class DefenseRequest extends Model
         'coordinator_reviewed_at' => 'datetime',
         'submitted_at' => 'datetime',
         'scheduled_date' => 'datetime',
+        'panels_assigned_at' => 'datetime',
         'scheduled_end_time' => 'string',
         'coordinator_assigned_at' => 'datetime',
         'coordinator_manually_assigned' => 'boolean',
