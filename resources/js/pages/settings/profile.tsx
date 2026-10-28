@@ -4,6 +4,7 @@ import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import type { User } from '@/types';
 import { type BreadcrumbItem, type SharedData } from '@/types';
+import { profileNameParts } from '@/utils/profile-name';
 import { Head, usePage } from '@inertiajs/react';
 import { Info } from 'lucide-react';
 import { useState } from 'react';
@@ -22,16 +23,14 @@ function getInitials(user: User) {
 }
 
 function getFullName(user: User) {
-    return (
-        user.display_name ??
-        user.name ??
-        [user.first_name, user.middle_name ? `${user.middle_name[0].toUpperCase()}.` : '', user.last_name].filter(Boolean).join(' ')
-    );
+    const name = profileNameParts(user);
+    return [name.firstName, name.middleInitial, name.lastName].filter(Boolean).join(' ') || user.display_name || user.name || 'User';
 }
 
 export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: boolean; status?: string }) {
     const { auth } = usePage<SharedData>().props;
     const user = auth.user;
+    const name = profileNameParts(user);
 
     type Adviser = { name: string; email: string };
     const adviser: Adviser | null = Array.isArray(user.advisers) ? (user.advisers[0] ?? null) : null;
@@ -66,8 +65,8 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                         <div>
                             <AlertTitle className="mb-1 font-semibold">Notice</AlertTitle>
                             <AlertDescription>
-                                Account details and information are fetched directly from the official myUIC portal database. Use the official myUIC
-                                portal if you wish to change any of the user information.
+                                Profile details come from your linked school account or Google sign-in. Contact your coordinator or administrator if
+                                your name or school information needs correction.
                             </AlertDescription>
                         </div>
                     </Alert>
@@ -85,7 +84,11 @@ export default function Profile({ mustVerifyEmail, status }: { mustVerifyEmail: 
                     <div className="mt-4 grid grid-cols-1 gap-x-12 gap-y-6 md:grid-cols-2">
                         <div>
                             <div className="text-muted-foreground mb-1 text-xs">First Name</div>
-                            <div className="text-base font-medium">{user.first_name}</div>
+                            <div className="text-base font-medium">{name.firstName || '�'}</div>
+                        </div>
+                        <div>
+                            <div className="text-muted-foreground mb-1 text-xs">Middle Initial</div>
+                            <div className="text-base font-medium">{name.middleInitial || '�'}</div>
                         </div>
                         <div>
                             <div className="text-muted-foreground mb-1 text-xs">Last Name</div>
