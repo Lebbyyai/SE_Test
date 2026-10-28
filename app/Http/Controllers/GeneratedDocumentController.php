@@ -8,6 +8,7 @@ use App\Models\GeneratedDocument;
 use App\Services\DocumentGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class GeneratedDocumentController extends Controller
 {
@@ -58,6 +59,11 @@ class GeneratedDocumentController extends Controller
         $defenseRequest = DefenseRequest::findOrFail($request->defense_request_id);
 
         $this->authorizeRequest($defenseRequest, true);
+        if (! Storage::disk('public')->exists($tpl->file_path)) {
+            throw ValidationException::withMessages([
+                'template_id' => 'The template PDF is missing from this installation. Ask the Dean to re-upload it in Document Templates, or upload the endorsement manually.',
+            ]);
+        }
         $generator = new DocumentGenerator;
         $generated = $generator->generate($tpl, $defenseRequest, $request->fields ?? []);
 

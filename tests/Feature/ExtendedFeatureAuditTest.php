@@ -309,4 +309,15 @@ class ExtendedFeatureAuditTest extends TestCase
         $this->actingAs($other)->getJson('/api/coordinator/defense-requests')->assertOk()->assertJsonMissing(['id' => $request->id]);
         $this->actingAs($coordinator)->getJson('/api/coordinator/defense-requests')->assertOk()->assertJsonFragment(['id' => $request->id]);
     }
+
+    public function test_missing_generation_template_returns_an_actionable_validation_error(): void
+    {
+        [$request, , $adviser] = $this->defense();
+        $template = $this->template($adviser);
+        Storage::disk('public')->delete($template->file_path);
+        $this->actingAs($adviser)->postJson('/api/generate-document', [
+            'template_id' => $template->id, 'defense_request_id' => $request->id, 'fields' => [],
+        ])->assertUnprocessable()->assertJsonValidationErrors('template_id');
+        $this->assertDatabaseCount('generated_documents', 0);
+    }
 }

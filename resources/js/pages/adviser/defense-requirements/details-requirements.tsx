@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
+import { csrfHeaders } from '@/lib/csrf';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import dayjs from 'dayjs';
@@ -134,10 +135,6 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
 
     const aiDetectionInputRef = useRef<HTMLInputElement>(null);
     const endorsementInputRef = useRef<HTMLInputElement>(null);
-
-    function csrf() {
-        return (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
-    }
 
     // --- Add state for missing docs alert ---
     const [, setMissingDocsAlert] = useState<string | null>(null);
@@ -378,9 +375,16 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
 
     useEffect(() => {
         setTemplatesLoading(true);
-        fetch('/api/document-templates')
-            .then((r) => r.json())
-            .then(setTemplates)
+        fetch('/api/document-templates', { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(15000) })
+            .then((r) => {
+                if (!r.ok) throw new Error('Could not load document templates. Refresh the page and try again.');
+                return r.json();
+            })
+            .then((data) => {
+                if (!Array.isArray(data)) throw new Error('Invalid template list. Refresh the page and try again.');
+                setTemplates(data);
+            })
+            .catch(() => toast.error('Could not load document templates. Refresh the page and try again.'))
             .finally(() => setTemplatesLoading(false));
     }, []);
 
@@ -394,54 +398,52 @@ function LoadedDetailsRequirementsPage(rawProps: PageProps) {
 
     // Auto Generate handler
     async function handleAutoGenerate() {
-        setAutoGenerating(true);
-        toast.loading('Generating document...');
-        const templateName = getTemplateNameForDefenseType(request.defense_type || '');
+        if (autoGenerating) return;
         if (templatesLoading) {
             toast.error('Templates are still loading. Please wait.');
-            setAutoGenerating(false);
             return;
         }
+        const templateName = getTemplateNameForDefenseType(request.defense_type || '');
         const template = templates.find((t) => t.name === templateName);
         if (!template) {
-            toast.error('No template found for this defense type.');
-            setAutoGenerating(false);
+            toast.error(
+                `No ${request.defense_type || 'matching'} endorsement template is configured. Ask the Dean to upload it in Document Templates, or upload the endorsement manually.`,
+            );
             return;
         }
+        setAutoGenerating(true);
+        const toastId = toast.loading('Generating document...');
         try {
             const res = await fetch('/api/generate-document', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/pdf',
-                    'X-CSRF-TOKEN': csrf(),
-                },
-                body: JSON.stringify({
-                    template_id: template.id,
-                    defense_request_id: request.id,
-                    fields: {},
-                }),
+                headers: csrfHeaders(true),
+                signal: AbortSignal.timeout(60000),
+                body: JSON.stringify({ template_id: template.id, defense_request_id: request.id, fields: {} }),
             });
-            if (!res.ok) {
-                toast.error('Failed to generate document.');
-                setAutoGenerating(false);
-                return;
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data?.ok || !data.download_url) {
+                const detail = data?.errors ? Object.values(data.errors).flat().join(' ') : data?.message || data?.error;
+                throw new Error(
+                    res.status === 419 ? 'Your session expired. Refresh the page and try again.' : detail || 'Failed to generate document.',
+                );
             }
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
-            link.href = url;
+            link.href = data.download_url;
             link.download = 'endorsement_form.pdf';
             document.body.appendChild(link);
             link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-            toast.success('Endorsement Form generated and downloaded!');
-        } catch {
-            toast.error('Network error generating document.');
+            link.remove();
+            toast.success('Endorsement generated. Review the downloaded PDF before submitting it.', { id: toastId });
+        } catch (error) {
+            const message =
+                error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)
+                    ? 'Document generation timed out. Please try again or upload the endorsement manually.'
+                    : error instanceof Error
+                      ? error.message
+                      : 'Network error generating document.';
+            toast.error(message, { id: toastId });
         } finally {
             setAutoGenerating(false);
-            toast.dismiss();
         }
     }
 
