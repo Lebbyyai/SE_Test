@@ -19,6 +19,20 @@ class UserSignatureController extends Controller
         );
     }
 
+    public function image(Request $request, UserSignature $signature)
+    {
+        abort_unless((int) $signature->user_id === (int) $request->user()->id, 403);
+        $path = ltrim(preg_replace('#^/?storage/#', '', $signature->image_path), '/');
+        abort_unless(str_starts_with($path, 'signatures/') && ! in_array('..', explode('/', $path), true), 404);
+        $disk = Storage::disk('public');
+        abort_unless($disk->exists($path), 404);
+
+        return $disk->response($path, 'signature.png', [
+            'Content-Type' => 'image/png', 'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+        ], 'inline');
+    }
+
     public function store(Request $r)
     {
         $data = $r->validate([

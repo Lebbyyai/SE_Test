@@ -18,6 +18,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'E‑Signatures', href: '/settin
 
 export default function SignaturesIndex() {
     const [list, setList] = useState<Sig[]>([]);
+    const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
     const [uploading, setUploading] = useState(false);
     const [drawingOpen, setDrawingOpen] = useState(false);
     const [tab, setTab] = useState<'draw' | 'upload'>('draw');
@@ -139,7 +140,18 @@ export default function SignaturesIndex() {
                                 key={s.id}
                                 className={`flex flex-col items-center gap-2 rounded border bg-white p-3 ${s.active ? 'ring-2 ring-green-500' : ''}`}
                             >
-                                <img src={`/storage/${s.image_path}`} className="max-h-24 object-contain" />
+                                {failedImages[s.id] ? (
+                                    <p className="max-w-48 text-center text-sm text-red-700" role="status">
+                                        Signature image unavailable. Please upload or draw your signature again.
+                                    </p>
+                                ) : (
+                                    <img
+                                        src={`/api/signatures/${s.id}/image`}
+                                        alt={s.label || 'Your signature'}
+                                        className="max-h-24 object-contain"
+                                        onError={() => setFailedImages((current) => ({ ...current, [s.id]: true }))}
+                                    />
+                                )}
                                 <Button size="sm" variant={s.active ? 'secondary' : 'default'} onClick={() => activate(s.id)}>
                                     {s.active ? 'Active' : 'Set Active'}
                                 </Button>

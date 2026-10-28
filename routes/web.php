@@ -509,6 +509,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/api/document-templates/{template}', [DocumentTemplateController::class, 'destroy']);
 
     Route::get('/api/signatures', [UserSignatureController::class, 'index']);
+    Route::get('/api/signatures/{signature}/image', [UserSignatureController::class, 'image'])->name('signatures.image');
     Route::post('/api/signatures', [UserSignatureController::class, 'store']);
     Route::patch('/api/signatures/{signature}/activate', [UserSignatureController::class, 'activate']);
 
