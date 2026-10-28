@@ -87,3 +87,34 @@ test('attached generated endorsements use the same ownership checks', function (
     $this->actingAs($student)->get('/storage/generated/endorsement.pdf')->assertOk();
     $this->actingAs(User::factory()->create(['role' => 'Adviser']))->get('/storage/generated/endorsement.pdf')->assertForbidden();
 });
+
+test('every correction replacement can be opened by its student and assigned adviser', function () {
+    [$row, $student, $adviser] = attachmentFixture();
+    $row->update(['workflow_state' => 'adviser-corrections', 'correction_stage' => 'adviser']);
+    $data = ['student_response' => 'Replaced all requested documents'];
+    $fields = ['manuscript_proposal', 'similarity_index', 'rec_endorsement', 'proof_of_payment', 'avisee_adviser_attachment'];
+    foreach ($fields as $field) {
+        $data[$field] = UploadedFile::fake()->createWithContent($field.'.pdf', "%PDF-1.4\nCorrection replacement fixture");
+    }
+    $this->actingAs($student)->post('/defense-requirements/'.$row->id.'/resubmit', $data,
+        ['Accept' => 'application/json'])->assertOk();
+    $row->refresh();
+    expect($row->workflow_state)->toBe('adviser-review');
+    foreach ($fields as $field) {
+        expect($row->$field)->toStartWith('defense_requirements/');
+        $url = '/storage/'.$row->$field;
+        $this->actingAs($student)->get($url)->assertOk();
+        $this->actingAs($adviser)->get($url)->assertOk();
+        $this->actingAs(User::factory()->create(['role' => 'Adviser']))->get($url)->assertForbidden();
+    }
+});
+
+test('already saved correction files using the historical hyphen directory remain accessible only to authorized accounts', function () {
+    [$row, $student, $adviser] = attachmentFixture();
+    $row->update(['manuscript_proposal' => 'defense-requirements/revised.pdf']);
+    Storage::disk('public')->put('defense-requirements/revised.pdf', "%PDF-1.4\nLegacy correction fixture");
+    $url = '/storage/defense-requirements/revised.pdf';
+    $this->actingAs($adviser)->get($url)->assertOk();
+    $this->actingAs($student)->get($url)->assertOk();
+    $this->actingAs(User::factory()->create(['role' => 'Student']))->get($url)->assertForbidden();
+});

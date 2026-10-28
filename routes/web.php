@@ -316,7 +316,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/storage/defense_requirements/{filename}', [DefenseRequestController::class, 'downloadAttachment'])
         ->defaults('directory', 'defense_requirements')->name('defense-requirements.attachment');
 
-    foreach (['defense_documents', 'generated'] as $directory) {
+    foreach (['defense_documents', 'generated', 'defense-requirements'] as $directory) {
         Route::get('/storage/'.$directory.'/{filename}', [DefenseRequestController::class, 'downloadAttachment'])
             ->defaults('directory', $directory)->name($directory.'.attachment');
     }

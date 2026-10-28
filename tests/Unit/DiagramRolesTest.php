@@ -52,10 +52,10 @@ afterEach(function () {
     }
 });
 
-it('creates exactly five requested role accounts and is safe to rerun', function () {
+it('creates the configured demo role accounts and is safe to rerun', function () {
     $this->artisan('demo:diagram-accounts')->assertSuccessful();
     $this->artisan('demo:diagram-accounts')->assertSuccessful();
-    expect(User::count())->toBe(5);
+    expect(User::count())->toBe(count(config('demo.accounts')));
     foreach (config('demo.accounts') as $email => $data) {
         $user = User::where('email', $email)->firstOrFail();
         expect($user->role)->toBe($data['role']);

@@ -66,7 +66,7 @@ class DefenseCorrectionController extends Controller
                     if (! $request->hasFile($field)) {
                         continue;
                     }
-                    $path = $request->file($field)->store('defense-requirements', 'public');
+                    $path = $request->file($field)->store('defense_requirements', 'public');
                     if (! $path) {
                         throw new \RuntimeException('Unable to store the replacement file.');
                     }
