@@ -7,6 +7,7 @@ use App\Mail\AdviserInvitation;
 use App\Mail\StudentAssignedToAdviser;
 use App\Models\Adviser;
 use App\Models\User;
+use App\Services\AccountProfileName;
 use App\Services\AdviserAssignmentNotifications;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -36,9 +37,12 @@ class CoordinatorAdviserController extends Controller
 
             // If a matching user exists but adviser row wasn't linked / active, reconcile now
             if ($matchedUser) {
-                $row->first_name = $matchedUser->first_name;
-                $row->middle_name = $matchedUser->middle_name ?? $row->middle_name;
-                $row->last_name = $matchedUser->last_name;
+                app(AccountProfileName::class)->fromAdviserRegistration($matchedUser);
+                if (! app(AccountProfileName::class)->isPlaceholder($matchedUser->first_name, $matchedUser->last_name)) {
+                    $row->first_name = $matchedUser->first_name;
+                    $row->middle_name = $matchedUser->middle_name ?? $row->middle_name;
+                    $row->last_name = $matchedUser->last_name;
+                }
                 $row->employee_id = $matchedUser->employee_id ?? $row->employee_id;
                 $row->status = 'active';
                 $row->user_id = $matchedUser->id;

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AccountProfileName;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -65,7 +66,7 @@ class GoogleAuthController extends Controller
                 return $this->failure('Please sign in with a verified @uic.edu.ph Google account.');
             }
 
-            $user = DB::transaction(function () use ($email, $googleId) {
+            $user = DB::transaction(function () use ($email, $googleId, $raw) {
                 $matches = User::whereRaw('LOWER(email) = ?', [$email])->lockForUpdate()->limit(2)->get();
                 if ($matches->count() !== 1 || $matches->first()->is_demo_account) {
                     return null;
@@ -75,6 +76,10 @@ class GoogleAuthController extends Controller
                     || User::where('google_id', $googleId)->whereKeyNot($user->id)->exists()) {
                     return null;
                 }
+
+                $names = app(AccountProfileName::class);
+                $names->fromGoogle($user, $raw);
+                $names->fromAdviserRegistration($user);
 
                 // Preserve the account's password, role, and academic assignments.
                 $user->forceFill([
