@@ -1,3 +1,4 @@
+import { DefenseDateControl, DefenseTimeControl } from '@/components/defense-scheduling-controls';
 import { csrfHeaders } from '@/lib/csrf';
 import { errorMessage } from '@/lib/error-message';
 import type { RequestActionResponse, WorkflowHistoryEntry } from '@/types/workflows';
@@ -30,7 +31,6 @@ import { toast, Toaster } from 'sonner';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar as CalendarCmp } from '@/components/ui/calendar';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -1184,56 +1184,23 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                                             </p>
                                         )}
                                     <div className="grid gap-4 md:grid-cols-2">
-                                        <div>
-                                            <div className="text-muted-foreground mb-1 text-xs">Date</div>
-                                            {/* --- SHADCN Date Picker --- */}
-                                            <Popover>
-                                                <PopoverTrigger asChild>
-                                                    <Button
-                                                        variant="outline"
-                                                        className={cn(
-                                                            'w-full justify-start text-left font-normal',
-                                                            !schedule.scheduled_date && 'text-muted-foreground',
-                                                        )}
-                                                        disabled={!canEdit || awaitingCorrections}
-                                                    >
-                                                        <Calendar className="mr-2 h-4 w-4" />
-                                                        {schedule.scheduled_date ? formatDate(schedule.scheduled_date) : 'Pick a date'}
-                                                    </Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="w-auto p-0" align="start">
-                                                    <CalendarCmp
-                                                        mode="single"
-                                                        selected={schedule.scheduled_date ? new Date(schedule.scheduled_date) : undefined}
-                                                        onSelect={(date) => {
-                                                            setSchedule((s) => ({
-                                                                ...s,
-                                                                scheduled_date: date ? format(date, 'yyyy-MM-dd') : '',
-                                                            }));
-                                                        }}
-                                                        initialFocus
-                                                    />
-                                                </PopoverContent>
-                                            </Popover>
-                                        </div>
-                                        <div>
-                                            <div className="text-muted-foreground mb-1 text-xs">Start Time</div>
-                                            <Input
-                                                type="time"
-                                                value={schedule.scheduled_time}
-                                                onChange={(e) => setSchedule((s) => ({ ...s, scheduled_time: e.target.value }))}
-                                                disabled={!canEdit || awaitingCorrections}
-                                            />
-                                        </div>
-                                        <div>
-                                            <div className="text-muted-foreground mb-1 text-xs">End Time</div>
-                                            <Input
-                                                type="time"
-                                                value={schedule.scheduled_end_time}
-                                                onChange={(e) => setSchedule((s) => ({ ...s, scheduled_end_time: e.target.value }))}
-                                                disabled={!canEdit || awaitingCorrections}
-                                            />
-                                        </div>
+                                        <DefenseDateControl
+                                            value={schedule.scheduled_date}
+                                            onChange={(value) => setSchedule((state) => ({ ...state, scheduled_date: value }))}
+                                            disabled={!canEdit || awaitingCorrections}
+                                        />
+                                        <DefenseTimeControl
+                                            label="Start time"
+                                            value={schedule.scheduled_time}
+                                            onChange={(value) => setSchedule((state) => ({ ...state, scheduled_time: value }))}
+                                            disabled={!canEdit || awaitingCorrections}
+                                        />
+                                        <DefenseTimeControl
+                                            label="End time"
+                                            value={schedule.scheduled_end_time}
+                                            onChange={(value) => setSchedule((state) => ({ ...state, scheduled_end_time: value }))}
+                                            disabled={!canEdit || awaitingCorrections}
+                                        />
                                         <div>
                                             <div className="text-muted-foreground mb-1 text-xs">Mode</div>
                                             <Select
