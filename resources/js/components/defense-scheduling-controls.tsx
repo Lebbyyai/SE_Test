@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
-import { joinClock, splitClock, type ClockParts } from '@/utils/scheduling-time';
+import { splitClock } from '@/utils/scheduling-time';
 import { CalendarDays } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 
 const selectClass =
     'bg-background text-foreground h-10 w-full rounded-md border px-2 text-sm [color-scheme:light] disabled:opacity-50 dark:[color-scheme:dark]';
@@ -109,61 +109,34 @@ export function DefenseTimeControl({
     onChange: (value: string) => void;
     disabled?: boolean;
 }) {
-    const [parts, setParts] = useState<ClockParts>(() => splitClock(value));
-    const lastEmitted = useRef(value);
-    useEffect(() => {
-        if (value !== lastEmitted.current) {
-            setParts(splitClock(value));
-            lastEmitted.current = value;
-        }
-    }, [value]);
-    const update = (field: keyof ClockParts, next: string) => {
-        const updated = { ...parts, [field]: next };
-        setParts(updated);
-        lastEmitted.current = joinClock(updated);
-        onChange(lastEmitted.current);
-    };
+    const times = Array.from({ length: 96 }, (_, index) => {
+        const minutes = index * 15;
+        return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    });
+    const selected = value.slice(0, 5);
+    // Keep an existing saved time selectable even when it is between quarter-hour options.
+    if (selected && !times.includes(selected)) times.push(selected);
+    times.sort();
     return (
-        <fieldset disabled={disabled} className="space-y-1">
-            <legend className="text-muted-foreground mb-1 text-xs">{label}</legend>
-            <div className="grid grid-cols-3 gap-2">
-                <select
-                    aria-label={`${label} hour`}
-                    className={selectClass}
-                    value={parts.hour}
-                    onChange={(event) => update('hour', event.target.value)}
-                >
-                    <option value="">Hour</option>
-                    {Array.from({ length: 12 }, (_, index) => (
-                        <option key={index + 1} value={index + 1}>
-                            {index + 1}
+        <label className="block space-y-2">
+            <span className="text-muted-foreground block text-xs">{label}</span>
+            <select
+                aria-label={label}
+                disabled={disabled}
+                className={selectClass}
+                value={selected}
+                onChange={(event) => onChange(event.target.value)}
+            >
+                <option value="">Select time</option>
+                {times.map((time) => {
+                    const parts = splitClock(time);
+                    return (
+                        <option key={time} value={time}>
+                            {parts.hour}:{parts.minute} {parts.period}
                         </option>
-                    ))}
-                </select>
-                <select
-                    aria-label={`${label} minute`}
-                    className={selectClass}
-                    value={parts.minute}
-                    onChange={(event) => update('minute', event.target.value)}
-                >
-                    <option value="">Minute</option>
-                    {Array.from({ length: 60 }, (_, index) => (
-                        <option key={index} value={String(index).padStart(2, '0')}>
-                            {String(index).padStart(2, '0')}
-                        </option>
-                    ))}
-                </select>
-                <select
-                    aria-label={`${label} AM or PM`}
-                    className={selectClass}
-                    value={parts.period}
-                    onChange={(event) => update('period', event.target.value)}
-                >
-                    <option value="">AM/PM</option>
-                    <option value="AM">AM</option>
-                    <option value="PM">PM</option>
-                </select>
-            </div>
-        </fieldset>
+                    );
+                })}
+            </select>
+        </label>
     );
 }
