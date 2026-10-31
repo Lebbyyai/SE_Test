@@ -12,6 +12,7 @@ use App\Models\Panelist;
 use App\Models\User;
 use App\Services\DefenseNotificationService;
 use App\Services\DefenseSchedulingService;
+use App\Services\PanelAvailabilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -582,6 +583,21 @@ class CoordinatorDefenseController extends Controller
         return app(PanelistController::class)->allCombined();
     }
 
+    public function panelAvailability(Request $request, DefenseRequest $defenseRequest)
+    {
+        app(DefenseSchedulingService::class)->authorize($defenseRequest, $request->user());
+        $data = $request->validate([
+            'date' => 'required|date_format:Y-m-d',
+            'time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:time',
+        ]);
+        $options = app(PanelistController::class)->allCombined()->getData(true);
+
+        return response()->json(app(PanelAvailabilityService::class)->forSlot(
+            $defenseRequest, $options, $data['date'], $data['time'], $data['end_time']
+        ))->header('Cache-Control', 'private, no-store');
+    }
+
     public function availablePanelMembersJson(Request $request)
     {
         $user = Auth::user();
@@ -668,7 +684,7 @@ class CoordinatorDefenseController extends Controller
         }
         $service = app(DefenseSchedulingService::class);
         $service->authorize($defenseRequest, $request->user());
-        $data = $request->validate(['defense_chairperson' => 'required|string|max:255', 'defense_panelist1' => 'required|string|max:255', 'defense_panelist2' => 'nullable|string|max:255', 'defense_panelist3' => 'nullable|string|max:255', 'defense_panelist4' => 'nullable|string|max:255']);
+        $data = $request->validate(['defense_chairperson' => 'required|string|max:255', 'defense_panelist1' => 'required|string|max:255', 'defense_panelist2' => 'nullable|string|max:255', 'defense_panelist3' => 'nullable|string|max:255', 'defense_panelist4' => 'nullable|string|max:255', 'availability_date' => 'nullable|required_with:availability_time,availability_end_time|date_format:Y-m-d', 'availability_time' => 'nullable|required_with:availability_date,availability_end_time|date_format:H:i', 'availability_end_time' => 'nullable|required_with:availability_date,availability_time|date_format:H:i|after:availability_time']);
         $updated = $service->persist($defenseRequest, $data, $request->user(), false);
 
         return $request->expectsJson() ? response()->json(['ok' => true, 'request' => $updated]) : back()->with('success', 'Panel assignments saved.');
@@ -681,7 +697,7 @@ class CoordinatorDefenseController extends Controller
         }
         $service = app(DefenseSchedulingService::class);
         $service->authorize($defenseRequest, $request->user());
-        $data = $request->validate(['scheduled_date' => 'required|date_format:Y-m-d', 'scheduled_time' => 'required|date_format:H:i', 'scheduled_end_time' => 'required|date_format:H:i|after:scheduled_time', 'defense_mode' => 'required|in:face-to-face,online', 'defense_venue' => 'required|string|max:255', 'scheduling_notes' => 'nullable|string|max:1000']);
+        $data = $request->validate(['scheduled_date' => 'required|date_format:Y-m-d', 'scheduled_time' => 'required|date_format:H:i', 'scheduled_end_time' => 'required|date_format:H:i|after:scheduled_time', 'defense_mode' => 'required|in:face-to-face,online', 'defense_venue' => 'required|string|max:255', 'scheduling_notes' => 'nullable|string|max:1000', 'defense_chairperson' => 'sometimes|required|string|max:255', 'defense_panelist1' => 'sometimes|required|string|max:255', 'defense_panelist2' => 'nullable|string|max:255', 'defense_panelist3' => 'nullable|string|max:255', 'defense_panelist4' => 'nullable|string|max:255']);
         $updated = $service->persist($defenseRequest, $data, $request->user(), true);
 
         return $request->expectsJson() ? response()->json(['ok' => true, 'request' => $updated]) : back()->with('success', 'Defense schedule saved.');

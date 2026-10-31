@@ -1,3 +1,4 @@
+import { csrfHeaders } from '@/lib/csrf';
 import { errorMessage } from '@/lib/error-message';
 import type { RequestActionResponse, WorkflowHistoryEntry } from '@/types/workflows';
 
@@ -30,7 +31,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar as CalendarCmp } from '@/components/ui/calendar';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -49,7 +50,24 @@ type PanelMemberOption = {
     email?: string;
     type?: string;
     status?: string;
+    identity?: string;
+    daily_defenses?: number;
+    is_available?: boolean;
+    bookings?: { start: string; end: string; overlaps: boolean; current: boolean }[];
 };
+
+type Availability = {
+    key: string;
+    options: PanelMemberOption[];
+    adviser: { is_available: boolean; bookings: { start: string; end: string; overlaps: boolean }[] } | null;
+};
+const matchesPanel = (option: PanelMemberOption, value: string) =>
+    String(option.id) === value || option.name === value || String(option.id) === 'panelist-' + value;
+const displaySlotTime = (time: string) => {
+    const [hour, minute] = time.split(':').map(Number);
+    return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
+};
+const slotLabel = (booking: { start: string; end: string }) => `${displaySlotTime(booking.start)}–${displaySlotTime(booking.end)}`;
 
 export type DefenseRequestFull = CorrectionDetails & {
     id: number;
@@ -160,40 +178,74 @@ function PanelMemberCombobox({
                     <Command shouldFilter={false}>
                         <CommandInput value={q} onValueChange={setQ} placeholder="Search..." className="h-9" autoFocus />
                         <CommandEmpty className="text-muted-foreground py-8 text-center text-sm">No matches.</CommandEmpty>
-                        <CommandGroup className="max-h-72 overflow-auto">
-                            {filtered.map((o) => {
-                                const isSelected = String(o.id) === value || o.name === value || String(o.id) === 'panelist-' + value;
-                                const dup =
-                                    (taken.has(o.name) || taken.has(String(o.id)) || taken.has(String(o.id).replace(/^panelist-/, ''))) &&
-                                    !isSelected;
-                                return (
-                                    <CommandItem
-                                        key={o.id}
-                                        value={o.name}
-                                        disabled={dup}
-                                        onSelect={() => {
-                                            if (dup) return;
-                                            onChange(String(o.id));
-                                            setOpen(false);
-                                            setQ('');
-                                        }}
-                                        className={`flex flex-col items-start gap-0.5 px-3 py-2 ${isSelected ? 'bg-muted' : ''} ${
-                                            dup ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-                                        }`}
-                                    >
-                                        <div className="flex w-full items-center gap-2">
-                                            <Check size={14} className={isSelected ? 'text-muted-foreground opacity-100' : 'opacity-0'} />
-                                            <span className="truncate text-sm">{o.name}</span>
-                                        </div>
-                                        {o.email && <span className="text-muted-foreground max-w-[250px] truncate pl-5 text-[11px]">{o.email}</span>}
-                                        {dup && !isSelected && <span className="text-muted-foreground pl-5 text-[10px]">Already chosen</span>}
-                                    </CommandItem>
-                                );
-                            })}
-                        </CommandGroup>
+                        <CommandList>
+                            <CommandGroup className="max-h-72 overflow-auto">
+                                {filtered.map((o) => {
+                                    const isSelected = String(o.id) === value || o.name === value || String(o.id) === 'panelist-' + value;
+                                    const dup =
+                                        (taken.has(o.identity || '') ||
+                                            taken.has(o.name) ||
+                                            taken.has(String(o.id)) ||
+                                            taken.has(String(o.id).replace(/^panelist-/, ''))) &&
+                                        !isSelected;
+                                    return (
+                                        <CommandItem
+                                            key={o.id}
+                                            value={o.name}
+                                            disabled={dup || o.is_available === false}
+                                            onSelect={() => {
+                                                if (dup || o.is_available === false) return;
+                                                onChange(String(o.id));
+                                                setOpen(false);
+                                                setQ('');
+                                            }}
+                                            className={`flex flex-col items-start gap-0.5 px-3 py-2 ${isSelected ? 'bg-muted' : ''} ${
+                                                dup || o.is_available === false ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+                                            }`}
+                                        >
+                                            <div className="flex w-full items-center gap-2">
+                                                <Check size={14} className={isSelected ? 'text-muted-foreground opacity-100' : 'opacity-0'} />
+                                                <span className="truncate text-sm">{o.name}</span>
+                                            </div>
+                                            {o.email && (
+                                                <span className="text-muted-foreground max-w-[250px] truncate pl-5 text-[11px]">{o.email}</span>
+                                            )}
+                                            {o.daily_defenses !== undefined && (
+                                                <span className="text-muted-foreground pl-5 text-[11px]">
+                                                    {o.is_available ? 'Available for this time' : 'Time conflict'} · {o.daily_defenses}{' '}
+                                                    {o.daily_defenses === 1 ? 'defense' : 'defenses'} that day
+                                                </span>
+                                            )}
+                                            {o.bookings?.map((booking, index) => (
+                                                <span
+                                                    key={index}
+                                                    className={cn(
+                                                        'pl-5 text-[11px]',
+                                                        booking.overlaps ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground',
+                                                    )}
+                                                >
+                                                    {booking.overlaps ? 'Overlaps' : 'Also scheduled'}: {slotLabel(booking)}
+                                                </span>
+                                            ))}
+                                            {dup && !isSelected && <span className="text-muted-foreground pl-5 text-[10px]">Already chosen</span>}
+                                        </CommandItem>
+                                    );
+                                })}
+                            </CommandGroup>
+                        </CommandList>
                     </Command>
                 </PopoverContent>
             </Popover>
+            {options.find((option) => matchesPanel(option, value))?.is_available === false && (
+                <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+                    This selection overlaps another defense. Choose another person or time.
+                </p>
+            )}
+            {value && !['Chairperson', 'Panelist 1'].includes(label) && (
+                <button type="button" disabled={disabled} className="text-muted-foreground text-xs underline" onClick={() => onChange('')}>
+                    Clear selection
+                </button>
+            )}
         </div>
     );
 }
@@ -324,9 +376,9 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
 
     // Schedule
     const [schedule, setSchedule] = useState({
-        scheduled_date: request.scheduled_date ?? '',
-        scheduled_time: request.scheduled_time ?? '',
-        scheduled_end_time: request.scheduled_end_time ?? '',
+        scheduled_date: request.scheduled_date?.slice(0, 10) ?? '',
+        scheduled_time: request.scheduled_time?.slice(0, 5) ?? '',
+        scheduled_end_time: request.scheduled_end_time?.slice(0, 5) ?? '',
         defense_mode: request.defense_mode ?? '',
         defense_venue: request.defense_venue ?? '',
         scheduling_notes: request.scheduling_notes ?? '',
@@ -335,54 +387,90 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
     const [savingPanels, setSavingPanels] = useState(false);
     const [savingSchedule, setSavingSchedule] = useState(false);
 
-    const taken = useMemo(() => new Set(Object.values(panels).filter(Boolean)), [panels]);
+    const [availability, setAvailability] = useState<Availability | null>(null);
+    const [availabilityError, setAvailabilityError] = useState('');
+    const [availabilityRevision, setAvailabilityRevision] = useState(0);
+    const slotKey = `${schedule.scheduled_date}|${schedule.scheduled_time}|${schedule.scheduled_end_time}|${availabilityRevision}`;
+    const validSlot =
+        !!schedule.scheduled_date &&
+        !!schedule.scheduled_time &&
+        !!schedule.scheduled_end_time &&
+        schedule.scheduled_end_time > schedule.scheduled_time;
+    const availabilityReady = validSlot && availability?.key === slotKey;
+    const availableOptions = availabilityReady ? availability.options : panelMembers;
+    const selectedConflicts =
+        availabilityReady &&
+        Object.values(panels).some((value) => value && !availability.options.some((option) => matchesPanel(option, value) && option.is_available));
+    const adviserConflict = availabilityReady && availability.adviser?.is_available === false;
+    const changingScheduledSlot =
+        request.workflow_state === 'scheduled' &&
+        (schedule.scheduled_date !== request.scheduled_date?.slice(0, 10) ||
+            schedule.scheduled_time !== request.scheduled_time?.slice(0, 5) ||
+            schedule.scheduled_end_time !== request.scheduled_end_time?.slice(0, 5));
+    useEffect(() => {
+        if (!validSlot) return;
+        const controller = new AbortController();
+        const timer = setTimeout(async () => {
+            setAvailabilityError('');
+            try {
+                const query = new URLSearchParams({
+                    date: schedule.scheduled_date,
+                    time: schedule.scheduled_time,
+                    end_time: schedule.scheduled_end_time,
+                });
+                const response = await fetch(`/coordinator/defense-requests/${request.id}/panel-availability?${query}`, {
+                    headers: { Accept: 'application/json' },
+                    signal: controller.signal,
+                    credentials: 'same-origin',
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || 'Could not check panel availability.');
+                if (!controller.signal.aborted) setAvailability({ ...data, key: slotKey });
+            } catch (error) {
+                if (!controller.signal.aborted) setAvailabilityError(error instanceof Error ? error.message : 'Could not check panel availability.');
+            }
+        }, 200);
+        return () => {
+            clearTimeout(timer);
+            controller.abort();
+        };
+    }, [request.id, schedule.scheduled_date, schedule.scheduled_time, schedule.scheduled_end_time, validSlot, slotKey]);
+    const taken = useMemo(() => {
+        const values = Object.values(panels).filter(Boolean);
+        const identities = panelMembers
+            .filter((option) => values.some((value) => matchesPanel(option, value)))
+            .map((option) => (option.email ? 'email:' + option.email.toLowerCase() : option.identity || option.name));
+        return new Set([...values, ...identities]);
+    }, [panels, panelMembers]);
 
     const canEdit = ['Coordinator', 'Administrative Assistant', 'Dean'].includes(userRole);
 
-    // Helper to always get a fresh CSRF token
-    async function getFreshCsrfToken(): Promise<string> {
-        try {
-            await fetch('/sanctum/csrf-cookie', { credentials: 'same-origin' });
-            const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
-            return token;
-        } catch {
-            return '';
-        }
-    }
-
-    // Robust fetch with CSRF retry and refresh
-    async function fetchWithCsrfRetry(url: string, options: RequestInit, retry = true) {
-        if (!options.headers) options.headers = {};
-        (options.headers as Record<string, string>)['X-CSRF-TOKEN'] = await getFreshCsrfToken();
-        let res: Response;
-        try {
-            res = await fetch(url, options);
-        } catch {
-            throw new Error('network');
-        }
-        if (res.status === 419 && retry) {
-            // CSRF error, try to refresh token and retry once
-            (options.headers as Record<string, string>)['X-CSRF-TOKEN'] = await getFreshCsrfToken();
-            try {
-                res = await fetch(url, options);
-            } catch {
-                throw new Error('network');
-            }
-        }
-        return res;
+    async function fetchWithSession(url: string, options: RequestInit) {
+        return fetch(url, { ...options, credentials: 'same-origin', headers: { ...options.headers, ...csrfHeaders(true) } });
     }
 
     async function savePanels() {
+        if (!availabilityReady || selectedConflicts || adviserConflict || changingScheduledSlot) {
+            toast.error(
+                'Check the selected time and panel availability first. For an existing defense, save time and panel changes together with Save Schedule.',
+            );
+            return;
+        }
         const toastId = toast.loading('Saving panel assignments...');
         setSavingPanels(true);
         try {
-            const res = await fetchWithCsrfRetry(`/coordinator/defense-requests/${request.id}/panels`, {
+            const res = await fetchWithSession(`/coordinator/defense-requests/${request.id}/panels`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
                 },
-                body: JSON.stringify(panels),
+                body: JSON.stringify({
+                    ...panels,
+                    availability_date: schedule.scheduled_date,
+                    availability_time: schedule.scheduled_time,
+                    availability_end_time: schedule.scheduled_end_time,
+                }),
             });
 
             const contentType = res.headers.get('content-type') || '';
@@ -400,6 +488,7 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
 
             if (res.ok && data.ok) {
                 setRequest((r) => ({ ...r, ...data.request }));
+                setAvailabilityRevision((revision) => revision + 1);
                 toast.success('Panels saved', {
                     id: toastId,
                     description: [
@@ -431,6 +520,10 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
     }
 
     async function saveSchedule() {
+        if (!availabilityReady || selectedConflicts || adviserConflict || !panels.defense_chairperson || !panels.defense_panelist1) {
+            toast.error('Choose a valid time, a chairperson, and at least one panel member without time conflicts.');
+            return;
+        }
         // Validate times
         if (
             !schedule.scheduled_date ||
@@ -456,13 +549,13 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
         const toastId = toast.loading('Saving schedule...');
         setSavingSchedule(true);
         try {
-            const res = await fetchWithCsrfRetry(`/coordinator/defense-requests/${request.id}/schedule-json`, {
+            const res = await fetchWithSession(`/coordinator/defense-requests/${request.id}/schedule-json`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
                 },
-                body: JSON.stringify(schedule),
+                body: JSON.stringify({ ...schedule, ...panels }),
             });
 
             const contentType = res.headers.get('content-type') || '';
@@ -480,6 +573,7 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
 
             if (res.ok && data.request) {
                 setRequest((r) => ({ ...r, ...data.request }));
+                setAvailabilityRevision((revision) => revision + 1);
                 toast.success('Schedule saved', {
                     id: toastId,
                     description: `${schedule.scheduled_date || ''} ${schedule.scheduled_time || ''}${
@@ -487,7 +581,15 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                     }`,
                 });
             } else {
-                toast.error(data.error || `Failed (${res.status})`, { id: toastId });
+                toast.error(
+                    Object.values(data.errors ?? {})
+                        .flat()
+                        .join(' ') ||
+                        data.error ||
+                        data.message ||
+                        `Failed (${res.status})`,
+                    { id: toastId },
+                );
             }
         } catch (err: unknown) {
             if (err instanceof Error && errorMessage(err) === 'network') {
@@ -500,7 +602,7 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
         }
     }
 
-    // --- Approve/Reject/Retrieve logic (robust, uses fetchWithCsrfRetry) ---
+    // --- Approve/Reject/Retrieve logic (robust, uses fetchWithSession) ---
     async function handleStatusChange(action: 'approve' | 'reject' | 'retrieve') {
         if (!request.id || awaitingCorrections) return;
         setIsLoading(true);
@@ -511,7 +613,7 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
         else if (action === 'retrieve') newStatus = 'Pending';
 
         try {
-            const res = await fetchWithCsrfRetry(`/defense-requests/${request.id}/status`, {
+            const res = await fetchWithSession(`/defense-requests/${request.id}/status`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1065,50 +1167,22 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
 
                             {/* ASSIGN & SCHEDULE TAB */}
                             <TabsContent value="assign-schedule" className="space-y-5">
-                                {/* Panel Assignment */}
-                                <div className={sectionClass}>
-                                    <h2 className="flex items-center gap-2 text-sm font-semibold">
-                                        <Users className="h-4 w-4" /> Panel Assignment
-                                    </h2>
-                                    <Separator />
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        {[
-                                            { label: 'Chairperson', key: 'defense_chairperson' },
-                                            { label: 'Panelist 1', key: 'defense_panelist1' },
-                                            { label: 'Panelist 2', key: 'defense_panelist2' },
-                                            { label: 'Panelist 3', key: 'defense_panelist3' },
-                                            { label: 'Panelist 4', key: 'defense_panelist4' },
-                                        ].map(({ label, key }) => (
-                                            <PanelMemberCombobox
-                                                key={key}
-                                                label={label}
-                                                value={panels[key as keyof typeof panels]}
-                                                onChange={(v) => setPanels((p) => ({ ...p, [key]: v }))}
-                                                options={panelMembers}
-                                                disabled={!canEdit || awaitingCorrections || loadingMembers}
-                                                taken={taken}
-                                            />
-                                        ))}
-                                    </div>
-                                    <div className="mt-4 flex justify-end">
-                                        <Button
-                                            onClick={savePanels}
-                                            disabled={!canEdit || awaitingCorrections || savingPanels}
-                                            className="gap-2 text-white hover:cursor-pointer dark:bg-rose-500"
-                                        >
-                                            {savingPanels && <Loader2 className="h-4 w-4 animate-spin" />}
-                                            <Save className="h-4 w-4" />
-                                            Save Panel Assignment
-                                        </Button>
-                                    </div>
-                                    {panelLoadError && <div className="mt-2 text-xs text-red-500">{panelLoadError}</div>}
-                                </div>
                                 {/* Scheduling */}
                                 <div className={sectionClass}>
                                     <h2 className="flex items-center gap-2 text-sm font-semibold">
                                         <Calendar className="h-4 w-4" /> Scheduling
                                     </h2>
                                     <Separator />
+                                    <p className="text-muted-foreground text-xs">
+                                        Choose the defense time in Philippine time, then select panel members below.
+                                    </p>
+                                    {schedule.scheduled_time &&
+                                        schedule.scheduled_end_time &&
+                                        schedule.scheduled_end_time <= schedule.scheduled_time && (
+                                            <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+                                                End time must be after start time.
+                                            </p>
+                                        )}
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div>
                                             <div className="text-muted-foreground mb-1 text-xs">Date</div>
@@ -1193,17 +1267,111 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                                             />
                                         </div>
                                     </div>
+                                </div>
+                                {/* Panel Assignment */}
+                                <div className={sectionClass}>
+                                    <h2 className="flex items-center gap-2 text-sm font-semibold">
+                                        <Users className="h-4 w-4" /> Panel Assignment
+                                    </h2>
+                                    <Separator />
+                                    <p className="text-muted-foreground text-xs">
+                                        Enter the date, start time, and end time above to check panel availability. Counts show recorded defenses on
+                                        that date, including this request once if already scheduled. There is no daily limit.
+                                    </p>
+                                    {validSlot && !availabilityReady && !availabilityError && (
+                                        <p role="status" className="text-muted-foreground text-xs">
+                                            Checking availability…
+                                        </p>
+                                    )}
+                                    {availabilityError && (
+                                        <div role="alert" className="text-sm text-red-600 dark:text-red-400">
+                                            {availabilityError}{' '}
+                                            <button
+                                                type="button"
+                                                className="underline"
+                                                onClick={() => setAvailabilityRevision((revision) => revision + 1)}
+                                            >
+                                                Retry
+                                            </button>
+                                        </div>
+                                    )}
+                                    {adviserConflict && (
+                                        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                                            The assigned adviser has an overlapping defense:{' '}
+                                            {availability?.adviser?.bookings
+                                                .filter((booking) => booking.overlaps)
+                                                .map(slotLabel)
+                                                .join(', ')}
+                                            . Choose another time.
+                                        </p>
+                                    )}
+                                    {changingScheduledSlot && (
+                                        <p className="text-muted-foreground text-xs">
+                                            Use Save Schedule below to save the new time and panel choices together.
+                                        </p>
+                                    )}
+
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {[
+                                            { label: 'Chairperson', key: 'defense_chairperson' },
+                                            { label: 'Panelist 1', key: 'defense_panelist1' },
+                                            { label: 'Panelist 2', key: 'defense_panelist2' },
+                                            { label: 'Panelist 3', key: 'defense_panelist3' },
+                                            { label: 'Panelist 4', key: 'defense_panelist4' },
+                                        ].map(({ label, key }) => (
+                                            <PanelMemberCombobox
+                                                key={key}
+                                                label={label}
+                                                value={panels[key as keyof typeof panels]}
+                                                onChange={(v) => setPanels((p) => ({ ...p, [key]: v }))}
+                                                options={availableOptions}
+                                                disabled={!canEdit || awaitingCorrections || loadingMembers || !availabilityReady}
+                                                taken={taken}
+                                            />
+                                        ))}
+                                    </div>
                                     <div className="mt-4 flex justify-end">
                                         <Button
-                                            onClick={saveSchedule}
-                                            disabled={!canEdit || awaitingCorrections || savingSchedule}
-                                            className="gap-2 hover:cursor-pointer dark:bg-rose-500 dark:text-white"
+                                            onClick={savePanels}
+                                            disabled={
+                                                !canEdit ||
+                                                awaitingCorrections ||
+                                                savingPanels ||
+                                                savingSchedule ||
+                                                !availabilityReady ||
+                                                selectedConflicts ||
+                                                adviserConflict ||
+                                                changingScheduledSlot
+                                            }
+                                            className="gap-2 text-white hover:cursor-pointer dark:bg-rose-500"
                                         >
-                                            {savingSchedule && <Loader2 className="h-4 w-4 animate-spin" />}
+                                            {savingPanels && <Loader2 className="h-4 w-4 animate-spin" />}
                                             <Save className="h-4 w-4" />
-                                            Save Schedule
+                                            Save Panel Assignment
                                         </Button>
                                     </div>
+                                    {panelLoadError && <div className="mt-2 text-xs text-red-500">{panelLoadError}</div>}
+                                </div>
+                                <div className="mt-4 flex justify-end">
+                                    <Button
+                                        onClick={saveSchedule}
+                                        disabled={
+                                            !canEdit ||
+                                            awaitingCorrections ||
+                                            savingSchedule ||
+                                            savingPanels ||
+                                            !availabilityReady ||
+                                            selectedConflicts ||
+                                            adviserConflict ||
+                                            !panels.defense_chairperson ||
+                                            !panels.defense_panelist1
+                                        }
+                                        className="gap-2 hover:cursor-pointer dark:bg-rose-500 dark:text-white"
+                                    >
+                                        {savingSchedule && <Loader2 className="h-4 w-4 animate-spin" />}
+                                        <Save className="h-4 w-4" />
+                                        Save Schedule
+                                    </Button>
                                 </div>
                             </TabsContent>
                         </Tabs>

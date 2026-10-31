@@ -410,6 +410,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('defense.panels.json');
         Route::post('/defense-requests/{defenseRequest}/schedule-json', [CoordinatorDefenseController::class, 'scheduleDefenseJson'])
             ->name('defense.schedule.json');
+        Route::get('/defense-requests/{defenseRequest}/panel-availability', [CoordinatorDefenseController::class, 'panelAvailability'])->name('defense.panel-availability');
         Route::get('/panel-members', [CoordinatorDefenseController::class, 'panelMembersAll'])
             ->name('defense.panel-members');
 

@@ -52,7 +52,17 @@ class DefenseSchedulingService
                     $data[$field] = (string) $panel->id;
                 }
             }
+            $availability = array_intersect_key($data, array_flip(['availability_date', 'availability_time', 'availability_end_time']));
+            $data = array_diff_key($data, $availability);
             $dr->fill($data);
+            if (! empty($availability['availability_date'])) {
+                $proposed = clone $dr;
+                $proposed->scheduled_date = $availability['availability_date'];
+                $proposed->scheduled_time = $availability['availability_time'];
+                $proposed->scheduled_end_time = $availability['availability_end_time'];
+                // Validate the draft slot inside the same scheduling lock; do not save it yet.
+                app(DefenseConflictService::class)->assertNoConflict($proposed);
+            }
             app(DefenseConflictService::class)->assertNoConflict($dr);
             if ($schedule) {
                 if (! $dr->defense_chairperson || ! $dr->defense_panelist1) {
