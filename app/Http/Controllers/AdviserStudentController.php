@@ -6,6 +6,7 @@ use App\Mail\StudentAcceptedByAdviser;
 use App\Mail\StudentRejectedByAdviser;
 use App\Models\User;
 use App\Services\AdviserAssignmentNotifications;
+use App\Services\StudentProgressService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -19,34 +20,36 @@ class AdviserStudentController extends Controller
     {
         abort_unless($request->user()?->role === 'Adviser', 403);
         $adviser = $request->user();
-        $students = $adviser->advisedStudents()
+        $assignedStudents = $adviser->advisedStudents()
             ->wherePivot('status', 'accepted')
-            ->get()
-            ->map(function ($s) {
-                // Get coordinator name from pivot
-                $coordinatorName = null;
-                if ($s->pivot && $s->pivot->requested_by) {
-                    $coordinator = User::find($s->pivot->requested_by);
-                    if ($coordinator) {
-                        $coordinatorName = trim(
-                            $coordinator->first_name.' '.
-                            ($coordinator->middle_name ? strtoupper($coordinator->middle_name[0]).'. ' : '').
-                            $coordinator->last_name
-                        );
-                    }
+            ->get();
+        $summaries = app(StudentProgressService::class)->summaries($assignedStudents);
+        $students = $assignedStudents->map(function ($s) use ($summaries) {
+            // Get coordinator name from pivot
+            $coordinatorName = null;
+            if ($s->pivot && $s->pivot->requested_by) {
+                $coordinator = User::find($s->pivot->requested_by);
+                if ($coordinator) {
+                    $coordinatorName = trim(
+                        $coordinator->first_name.' '.
+                        ($coordinator->middle_name ? strtoupper($coordinator->middle_name[0]).'. ' : '').
+                        $coordinator->last_name
+                    );
                 }
+            }
 
-                return [
-                    'id' => $s->id,
-                    'student_number' => $s->student_number ?? null,
-                    'first_name' => $s->first_name ?? null,
-                    'middle_name' => $s->middle_name ?? null,
-                    'last_name' => $s->last_name ?? null,
-                    'email' => $s->email ?? null,
-                    'program' => $s->program ?? null,
-                    'coordinator_name' => $coordinatorName,
-                ];
-            })->values();
+            return [
+                'id' => $s->id,
+                'student_number' => $s->student_number ?: $s->school_id,
+                'progress' => $summaries[$s->id] ?? null,
+                'first_name' => $s->first_name ?? null,
+                'middle_name' => $s->middle_name ?? null,
+                'last_name' => $s->last_name ?? null,
+                'email' => $s->email ?? null,
+                'program' => $s->program ?? null,
+                'coordinator_name' => $coordinatorName,
+            ];
+        })->values();
 
         return response()->json($students);
     }

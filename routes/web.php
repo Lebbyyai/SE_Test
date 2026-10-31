@@ -5,6 +5,7 @@ use App\Http\Controllers\AA\PaymentVerificationController;
 use App\Http\Controllers\AcademicRecordController;
 use App\Http\Controllers\Admin\UserRoleController;
 use App\Http\Controllers\AdviserStudentController;
+use App\Http\Controllers\AdviserStudentProgressController;
 use App\Http\Controllers\Api\ComprehensiveExamEligibilityController;
 use App\Http\Controllers\Api\StudentSearchController;
 use App\Http\Controllers\ComprehensiveExamController;
@@ -617,6 +618,8 @@ if (file_exists(__DIR__.'/settings.php')) {
 }
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/adviser/students/{student}/progress', [AdviserStudentProgressController::class, 'show'])->name('adviser.student-progress');
+    Route::put('/adviser/students/{student}/progress', [AdviserStudentProgressController::class, 'update'])->name('adviser.student-progress.update');
     Route::get('/api/adviser/students', [AdviserStudentController::class, 'index']);
     Route::post('/api/adviser/students', [AdviserStudentController::class, 'store']);
     Route::post('/api/adviser/register-with-code', [AdviserStudentController::class, 'registerWithCode']);

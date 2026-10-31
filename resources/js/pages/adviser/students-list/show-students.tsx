@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import { Check, Mail, Trash, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -17,6 +18,7 @@ type Student = {
     last_name: string | null;
     email: string | null;
     program: string | null;
+    progress?: { stage: string | null; status: string; enrollment_year: number | null; completion_year: number | null };
     coordinator_name?: string | null; // <-- Add this line
 };
 
@@ -121,7 +123,7 @@ export default function ShowStudents() {
         if (rows.length === 0) {
             return (
                 <TableRow>
-                    <TableCell colSpan={isPending ? 6 : 5} className="text-muted-foreground py-8 text-center text-sm dark:text-zinc-400">
+                    <TableCell colSpan={isPending ? 6 : 9} className="text-muted-foreground py-8 text-center text-sm dark:text-zinc-400">
                         No students found.
                     </TableCell>
                 </TableRow>
@@ -142,6 +144,21 @@ export default function ShowStudents() {
                 <TableCell className="dark:text-zinc-200">{s.email || 'N/A'}</TableCell>
                 <TableCell className="dark:text-zinc-200">{s.program || 'N/A'}</TableCell>
                 <TableCell className="dark:text-zinc-200">{s.coordinator_name || 'N/A'}</TableCell>
+                {!isPending && (
+                    <>
+                        <TableCell>
+                            <p className="text-sm">{s.progress?.stage || 'Not started'}</p>
+                            <p className="text-muted-foreground text-xs">{s.progress?.status || 'No defense request'}</p>
+                        </TableCell>
+                        <TableCell>{s.progress?.enrollment_year ?? 'Not available'}</TableCell>
+                        <TableCell>{s.progress?.completion_year ?? 'Not verified'}</TableCell>
+                        <TableCell>
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={`/adviser/students/${s.id}/progress`}>View Progress</Link>
+                            </Button>
+                        </TableCell>
+                    </>
+                )}
                 {isPending && (
                     <TableCell className="flex justify-center gap-2">
                         <Button
@@ -271,6 +288,10 @@ export default function ShowStudents() {
                                     <TableHead className="dark:text-zinc-100">Email</TableHead>
                                     <TableHead className="dark:text-zinc-100">Program</TableHead>
                                     <TableHead className="dark:text-zinc-100">Program Coordinator</TableHead>
+                                    <TableHead>Defense stage / status</TableHead>
+                                    <TableHead>Enrollment year</TableHead>
+                                    <TableHead>Completion year</TableHead>
+                                    <TableHead>Progress</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>{renderTableRows(filteredStudents, false)}</TableBody>
