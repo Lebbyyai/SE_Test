@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\ComprehensiveSession;
 use App\Models\DefenseRequest;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Schema;
 
 class PanelAvailabilityService
 {
@@ -28,19 +30,37 @@ class PanelAvailabilityService
                 ];
             }
         }
+
+        if (Schema::hasTable('comprehensive_sessions')) {
+            foreach (ComprehensiveSession::where('exam_date', $date)->get() as $session) {
+                foreach ($session->faculty as $faculty) {
+                    if ($faculty['status'] === 'declined') {
+                        continue;
+                    }
+                    $identity = $conflicts->userIdentity($faculty['user_id']);
+                    $bookings[$identity][] = ['start' => substr($session->start_time, 0, 5), 'end' => substr($session->end_time, 0, 5), 'overlaps' => substr($session->start_time, 0, 5) < $end && substr($session->end_time, 0, 5) > $start, 'current' => false, 'kind' => 'comprehensive'];
+                }
+            }
+        }
         $describe = function (string $identity) use ($bookings) {
             $all = $bookings[$identity] ?? [];
 
             return [
                 'identity' => $identity,
-                'daily_defenses' => count($all),
+                'daily_defenses' => count(array_filter($all, fn ($booking) => ($booking['kind'] ?? 'defense') === 'defense')),
                 'is_available' => ! collect($all)->contains('overlaps', true),
                 'bookings' => array_values(array_filter($all, fn ($booking) => ! $booking['current'])),
             ];
         };
 
+        $proposal = app(DefenseSchedulingService::class)->proposalPanel($current);
+        $proposalPanelAvailable = $proposal ? collect(DefenseConflictService::PANEL_FIELDS)->every(
+            fn ($field) => ! $proposal->$field || $describe($conflicts->identity($proposal->$field))['is_available']
+        ) : null;
+
         return [
             'date' => $date, 'time' => $start, 'end_time' => $end,
+            'proposal_panel_available' => $proposalPanelAvailable,
             'options' => array_map(function ($option) use ($conflicts, $describe) {
                 $identity = ! empty($option['email']) ? 'email:'.strtolower($option['email'])
                     : $conflicts->identity(preg_replace('/^panelist-/', '', $option['id']));

@@ -8,11 +8,28 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import type { CompreExamApplicationSummary } from './Index';
 
-export default function Details({ application }: { application: CompreExamApplicationSummary }) {
+export default function Details({ application, canEvaluateResponse }: { application: CompreExamApplicationSummary; canEvaluateResponse: boolean }) {
     const elig = application.eligible;
     const [status, setStatus] = useState(application.application_status);
     const [remarks, setRemarks] = useState(application.review_remarks ?? '');
     const [saving, setSaving] = useState(false);
+    const [evaluatedAt, setEvaluatedAt] = useState(application.response?.evaluated_at ?? null);
+    const [evaluating, setEvaluating] = useState(false);
+
+    function markResponseEvaluated() {
+        if (!application.response || evaluatedAt) return;
+        setEvaluating(true);
+        router.post(
+            `/aa/responses/${application.response.id}/evaluate`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => setEvaluatedAt(new Date().toISOString()),
+                onFinish: () => setEvaluating(false),
+            },
+        );
+    }
+
     async function review(decision: 'approved' | 'rejected') {
         if (!window.confirm(`Confirm that this application should be ${decision}?`)) return;
         setSaving(true);
@@ -141,7 +158,73 @@ export default function Details({ application }: { application: CompreExamApplic
                 </div>
             </div>
 
-            {application.application_id && status === 'pending' && (
+            {application.subjects.length > 0 && (
+                <section className="mt-5 space-y-3 border-t pt-4">
+                    <h3 className="font-semibold">Exam subjects and schedules</h3>
+                    <div className="space-y-2">
+                        {application.subjects.map((subject, index) => (
+                            <div key={`${subject.code || subject.name || 'subject'}-${index}`} className="rounded-md border p-3">
+                                <div className="font-medium">{subject.name || 'Subject not specified'}</div>
+                                {subject.code && <div className="text-muted-foreground text-xs">Code: {subject.code}</div>}
+                                <div className="text-muted-foreground mt-1 text-xs">
+                                    {subject.date || 'Date not set'}
+                                    {subject.start_time && subject.end_time
+                                        ? ` · ${subject.start_time.slice(0, 5)}–${subject.end_time.slice(0, 5)}`
+                                        : ''}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {application.response && (
+                <section className="mt-5 space-y-3 border-t pt-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h3 className="font-semibold">Student response details</h3>
+                            <p className="text-muted-foreground text-xs">Submitted {new Date(application.response.created_at).toLocaleString()}</p>
+                        </div>
+                        {evaluatedAt ? (
+                            <Badge variant="outline" className="border-green-600 text-green-700">
+                                Evaluated
+                            </Badge>
+                        ) : canEvaluateResponse ? (
+                            <Button size="sm" disabled={evaluating} onClick={markResponseEvaluated}>
+                                {evaluating ? 'Saving...' : 'Mark evaluated'}
+                            </Button>
+                        ) : null}
+                    </div>
+                    <dl className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
+                        <div>
+                            <dt className="text-muted-foreground text-xs">Family name</dt>
+                            <dd>{application.response.family_name}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground text-xs">First name</dt>
+                            <dd>{application.response.first_name}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground text-xs">Program</dt>
+                            <dd>{application.response.program}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground text-xs">Contact number</dt>
+                            <dd>{application.response.contact_number}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground text-xs">Email address</dt>
+                            <dd>{application.response.email_address}</dd>
+                        </div>
+                        <div>
+                            <dt className="text-muted-foreground text-xs">ID number</dt>
+                            <dd>{application.response.id_number}</dd>
+                        </div>
+                    </dl>
+                </section>
+            )}
+
+            {application.application_id && application.can_review && status === 'pending' && (
                 <section className="mt-5 space-y-3 border-t pt-4">
                     <h3 className="font-semibold">Review application</h3>
                     <Input

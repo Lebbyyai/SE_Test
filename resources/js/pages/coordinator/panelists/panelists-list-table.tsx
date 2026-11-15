@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { Assignment, Panelist, PaymentRate } from '@/types';
+import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import { Loader2, Mail, MessageCircle, Pencil, RefreshCw, Trash2, User, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -238,6 +239,11 @@ export default function PanelistsListTable({ panelists, paymentRates, onEdit, on
                         </div>
                     </DialogHeader>
 
+                    {viewPanelist && (
+                        <Link className="text-sm underline underline-offset-4" href={'/defense-register?panelist=' + viewPanelist.id}>
+                            Filter this panelist’s defense schedule
+                        </Link>
+                    )}
                     <div className="mt-4">
                         <Tabs value={panelistTab} onValueChange={(v: string) => setPanelistTab(v as 'assignments' | 'pending')}>
                             <div className="mb-2 flex items-center justify-between">

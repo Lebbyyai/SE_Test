@@ -21,6 +21,9 @@ type Item = {
     title: string;
     program: string;
     defense_type: string;
+    research_subject: string | null;
+    subject_enrollment: string | null;
+    current_stage: string | null;
     date: string;
     start: string;
     end: string;
@@ -36,7 +39,18 @@ type Item = {
     roster_error?: string;
     history: Previous[];
 };
-type Props = { items: Item[]; from: string; to: string; today: string };
+const defenseStages = { proposal: 'Proposal', prefinal: 'Pre-Final', final: 'Final' };
+type Stage = keyof typeof defenseStages | '';
+type Props = {
+    items: Item[];
+    from: string;
+    to: string;
+    stage: Stage;
+    today: string;
+    panelist: number | null;
+    panelists: { id: number; name: string }[];
+    canReviewPanelAssignments: boolean;
+};
 const labels: Record<string, string> = {
     pending: 'Attendance / service awaiting confirmation',
     confirmed: 'Service confirmed',
@@ -44,8 +58,9 @@ const labels: Record<string, string> = {
 };
 
 export default function DefenseRegister() {
-    const { items, from, to, today } = usePage<Props>().props;
-    const filter = useForm({ from, to });
+    const { items, from, to, stage, today, panelist, panelists, canReviewPanelAssignments } = usePage<Props>().props;
+    const filter = useForm({ from, to, stage, panelist: panelist?.toString() ?? '' });
+    const [singleDay, setSingleDay] = useState(from === to);
     const [selected, setSelected] = useState<Item | null>(null);
     const [people, setPeople] = useState<Person[]>([]);
     const [completedOn, setCompletedOn] = useState(today);
@@ -54,7 +69,11 @@ export default function DefenseRegister() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
-    const query = new URLSearchParams({ from, to }).toString();
+    const query = new URLSearchParams({ from, to });
+    if (stage) query.set('stage', stage);
+    if (panelist !== null) query.set('panelist', String(panelist));
+    const selectedPanelist = panelists.find((person) => person.id === panelist);
+    const appliedDates = from === to ? from : from + ' to ' + to;
     const changedTypes =
         selected &&
         people.some(
@@ -140,29 +159,82 @@ export default function DefenseRegister() {
                     onSubmit={(event) => {
                         event.preventDefault();
                         filter.clearErrors();
-                        const days = (Date.parse(filter.data.to) - Date.parse(filter.data.from)) / 86400000;
+                        const end = singleDay ? filter.data.from : filter.data.to;
+                        const days = (Date.parse(end) - Date.parse(filter.data.from)) / 86400000;
                         if (!Number.isFinite(days) || days < 0 || days > 92) {
                             filter.setError('to', 'Choose a range of no more than 93 days, with the end on or after the start.');
                             return;
                         }
+                        filter.transform((data) => ({ ...data, to: end }));
                         filter.get('/defense-register', { preserveScroll: true, preserveState: true });
                     }}
                 >
+                    <label className="space-y-1 text-sm">
+                        <span>Date selection</span>
+                        <select
+                            className="bg-background border-input block h-9 rounded-md border px-2"
+                            value={singleDay ? 'single' : 'range'}
+                            onChange={(event) => {
+                                setSingleDay(event.target.value === 'single');
+                                if (filter.data.to < filter.data.from) filter.setData('to', filter.data.from);
+                            }}
+                        >
+                            <option value="range">Date range</option>
+                            <option value="single">Single date</option>
+                        </select>
+                    </label>
                     <label className="text-sm">
-                        From
+                        {singleDay ? 'Defense date' : 'From'}
                         <Input type="date" required value={filter.data.from} onChange={(event) => filter.setData('from', event.target.value)} />
                     </label>
-                    <label className="text-sm">
-                        To
-                        <Input
-                            type="date"
-                            required
-                            min={filter.data.from}
-                            value={filter.data.to}
-                            onChange={(event) => filter.setData('to', event.target.value)}
-                        />
+                    {!singleDay && (
+                        <label className="text-sm">
+                            To
+                            <Input
+                                type="date"
+                                required
+                                min={filter.data.from}
+                                value={filter.data.to}
+                                onChange={(event) => filter.setData('to', event.target.value)}
+                            />
+                        </label>
+                    )}
+                    <label className="space-y-1 text-sm">
+                        <span>Defense type</span>
+                        <select
+                            className="bg-background border-input block h-9 rounded-md border px-2"
+                            value={filter.data.stage}
+                            onChange={(event) => filter.setData('stage', event.target.value as Stage)}
+                        >
+                            <option value="">All stages</option>
+                            {Object.entries(defenseStages).map(([value, label]) => (
+                                <option key={value} value={value}>
+                                    {label}
+                                </option>
+                            ))}
+                        </select>
                     </label>
-                    <Button disabled={filter.processing}>Apply dates</Button>
+                    {canReviewPanelAssignments && (
+                        <label className="space-y-1 text-sm">
+                            <span>Panelist</span>
+                            <select
+                                className="bg-background border-input block h-9 max-w-64 rounded-md border px-2"
+                                value={filter.data.panelist}
+                                onChange={(event) => filter.setData('panelist', event.target.value)}
+                            >
+                                <option value="">All panelists</option>
+                                {filter.data.panelist && !panelists.some((person) => String(person.id) === filter.data.panelist) && (
+                                    <option value={filter.data.panelist}>Selected panelist</option>
+                                )}
+                                {panelists.map((person) => (
+                                    <option key={person.id} value={person.id}>
+                                        {person.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    )}
+                    <Button disabled={filter.processing}>Apply filters</Button>
                     <a
                         href={`/defense-register/export?${query}`}
                         className="hover:bg-accent inline-flex h-10 items-center rounded-lg border px-3 text-sm"
@@ -180,16 +252,24 @@ export default function DefenseRegister() {
                     >
                         Print / Save as PDF
                     </a>
-                    {(filter.errors.from || filter.errors.to) && (
+                    {(filter.errors.from || filter.errors.to || filter.errors.stage || filter.errors.panelist) && (
                         <p role="alert" className="w-full text-sm text-red-600 dark:text-red-400">
-                            {filter.errors.from || filter.errors.to}
+                            {filter.errors.from || filter.errors.to || filter.errors.stage || filter.errors.panelist}
                         </p>
                     )}
                     <p className="text-muted-foreground w-full text-xs">
-                        Exports use the displayed date range ({from} to {to}), in Philippine time. Maximum 93 days. Simultaneous sessions remain
-                        separate entries.
+                        Exports use the applied filters. Dates are in Philippine time, and date ranges can span up to 93 days.
                     </p>
                 </form>
+                <p role="status" className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <strong>
+                        {items.length} {items.length === 1 ? 'defense' : 'defenses'}
+                    </strong>
+                    <span className="text-muted-foreground text-sm">
+                        {appliedDates} · {stage ? defenseStages[stage] : 'All defense types'}
+                        {panelist !== null && <> · {selectedPanelist?.name ?? 'Selected panelist'}</>}
+                    </span>
+                </p>
                 <div className="overflow-x-auto rounded-lg border">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-muted">
@@ -231,6 +311,22 @@ export default function DefenseRegister() {
                                             {item.program} · {item.defense_type}
                                         </p>
                                         <p className="text-muted-foreground mt-1">{item.title}</p>
+                                        {canReviewPanelAssignments && (
+                                            <dl className="mt-2 space-y-1 text-xs">
+                                                <div>
+                                                    <dt className="text-muted-foreground inline">
+                                                        {item.research_subject ? 'Defense subject: ' : 'Recorded enrollment: '}
+                                                    </dt>
+                                                    <dd className="inline">{item.research_subject || item.subject_enrollment || 'Not recorded'}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-muted-foreground inline">Current stage: </dt>
+                                                    <dd className="inline">
+                                                        {item.current_stage === 'Prefinal' ? 'Pre-Final' : item.current_stage || 'Not recorded'}
+                                                    </dd>
+                                                </div>
+                                            </dl>
+                                        )}
                                     </td>
                                     <td className="min-w-56 p-3">
                                         {item.participants.map((person) => (
@@ -263,7 +359,7 @@ export default function DefenseRegister() {
                             {items.length === 0 && (
                                 <tr>
                                     <td colSpan={5} className="text-muted-foreground p-8 text-center">
-                                        No scheduled defenses in this date range. Change the dates or schedule an approved request first.
+                                        No defenses match the selected dates and stage.
                                     </td>
                                 </tr>
                             )}

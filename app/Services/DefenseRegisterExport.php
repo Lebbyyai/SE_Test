@@ -11,9 +11,10 @@ class DefenseRegisterExport
     public function matrix(array $items): array
     {
         $dates = collect($items)->pluck('date')->unique()->sort()->values()->all();
-        $slots = collect($items)->pluck('start')->unique()->sort()->values()->all();
+
         $grid = [];
         foreach ($items as $item) {
+            $slot = $item['start'] ? $item['start'].'–'.($item['end'] ?: 'End unspecified') : 'Time unspecified';
             $people = collect($item['participants']);
             $prefix = '#'.$item['id'].' ';
             $warning = empty($item['roster_error']) ? '' : "\nCommittee needs review: ".$item['roster_error'];
@@ -22,19 +23,21 @@ class DefenseRegisterExport
                 $warning .= "\nAcademic: ".$outcome['completion'].' / '.$outcome['result'].' · '.$outcome['subject'].(! empty($outcome['next_stage']) ? ' · Next stage: '.$outcome['next_stage'] : '').($outcome['current'] ? '' : ' · Needs reconfirmation');
             }
             $lines = [
-                'Defense' => $prefix.$item['student'].' — '.$item['defense_type']."\n".$item['title']."\nAdviser: ".($item['adviser'] ?: 'Unassigned')."\n".($item['start'] ?: 'Time unspecified').($item['end'] ? '–'.$item['end'] : '').' · '.($item['mode'] ?: 'Mode unspecified').' · '.($item['venue'] ?: 'Venue unspecified').$warning,
+                'Defense' => $prefix.$item['student'].' — '.$item['defense_type']."\n".$item['title']."\nAdviser: ".($item['adviser'] ?: 'Unassigned')."\n".$slot.' · '.($item['mode'] ?: 'Mode unspecified').' · '.($item['venue'] ?: 'Venue unspecified').$warning,
                 'Chair / internal panel' => $people->where('affiliation', 'internal')->map(fn ($p) => $p['recipient_name'].' ('.$p['recipient_role'].')')->implode(', '),
                 'External panel' => $people->where('affiliation', 'external')->map(fn ($p) => $p['recipient_name'].' ('.$p['recipient_role'].')')->implode(', '),
                 'Unclassified panel' => $people->where('recipient_role', '!=', 'Adviser')->filter(fn ($p) => ! $p['affiliation'])->map(fn ($p) => $p['recipient_name'].' ('.$p['recipient_role'].')')->implode(', '),
             ];
             foreach ($lines as $kind => $text) {
                 if ($text !== '') {
-                    $grid[$item['start']][$item['date']][$kind][] = $kind === 'Defense' ? $text : $prefix.$text;
+                    $grid[$slot][$item['date']][$kind][] = $kind === 'Defense' ? $text : $prefix.$text;
                 }
             }
         }
 
-        return ['dates' => $dates, 'slots' => $slots, 'grid' => $grid, 'kinds' => ['Defense', 'Chair / internal panel', 'External panel', 'Unclassified panel']];
+        ksort($grid, SORT_STRING);
+
+        return ['dates' => $dates, 'slots' => array_keys($grid), 'grid' => $grid, 'kinds' => ['Defense', 'Chair / internal panel', 'External panel', 'Unclassified panel']];
     }
 
     public function xlsx(array $data): string
@@ -43,7 +46,7 @@ class DefenseRegisterExport
         $schedule = [['Graduate School Defense Schedule'], [$data['from'].' to '.$data['to'].' (Philippine time)'], ['Scheduled entries do not establish attendance or payment.'], ['Time / detail', ...array_map(fn ($date) => CarbonImmutable::parse($date), $matrix['dates'])]];
         foreach ($matrix['slots'] as $slot) {
             foreach ($matrix['kinds'] as $kind) {
-                $schedule[] = [($slot ?: 'Unspecified')."\n".$kind, ...array_map(fn ($date) => implode("\n\n", $matrix['grid'][$slot][$date][$kind] ?? []), $matrix['dates'])];
+                $schedule[] = [$slot."\n".$kind, ...array_map(fn ($date) => implode("\n\n", $matrix['grid'][$slot][$date][$kind] ?? []), $matrix['dates'])];
             }
         }
         $details = [['Request ID', 'Date', 'Start', 'End', 'Student', 'School ID', 'Program', 'Title', 'Defense stage', 'Mode', 'Venue', 'Adviser', 'Service status', 'Completed on', 'Defense completion', 'Academic result', 'Research subject', 'Next stage', 'Academic outcome current']];

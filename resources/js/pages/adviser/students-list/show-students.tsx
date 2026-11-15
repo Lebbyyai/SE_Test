@@ -5,7 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { defaultProgressFilters, filterStudentProgress, type StudentProgressSummary } from '@/utils/student-progress-filters';
+import {
+    defaultProgressFilters,
+    filterStudentProgress,
+    filterStudentsByProgram,
+    studentProgramOptions,
+    type ProgramCatalogEntry,
+    type StudentProgressSummary,
+} from '@/utils/student-progress-filters';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import { Check, Mail, Trash, Users } from 'lucide-react';
@@ -29,13 +36,14 @@ function getInitials(student: Student) {
     return (first + last).toUpperCase() || 'U';
 }
 
-export default function ShowStudents() {
+export default function ShowStudents({ programCatalog }: { programCatalog: ProgramCatalogEntry[] }) {
     const [students, setStudents] = useState<Student[]>([]);
     const [pendingStudents, setPendingStudents] = useState<Student[]>([]);
     const [pendingLoading, setPendingLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState('');
     const [filters, setFilters] = useState(defaultProgressFilters);
+    const [program, setProgram] = useState('');
 
     const [confirmation, setConfirmation] = useState<{ student: Student; decision: 'accept' | 'reject' } | null>(null);
 
@@ -78,9 +86,11 @@ export default function ShowStudents() {
             (s.program?.toLowerCase().includes(lowerQuery) ?? false),
     );
 
-    const filteredStudents = filterStudentProgress(searchedStudents, filters);
-    const years = (field: 'enrollment_year' | 'completion_year') =>
-        [...new Set(students.flatMap((s) => (s.progress?.[field] ? [s.progress[field]!] : [])))].sort((a, b) => b - a);
+    const { choices, keyForStudent } = studentProgramOptions(students, programCatalog);
+    const filteredStudents = filterStudentsByProgram(filterStudentProgress(searchedStudents, filters), program, filters.sort, keyForStudent);
+    const completionYears = [...new Set(students.flatMap((s) => (s.progress?.completion_year ? [s.progress.completion_year] : [])))].sort(
+        (a, b) => b - a,
+    );
     const semesters = [...new Set(students.flatMap((s) => (s.progress?.semester ? [s.progress.semester] : [])))].sort();
     const selectClass = 'bg-background border-input h-9 w-full rounded-md border px-2 text-sm';
 
@@ -158,7 +168,7 @@ export default function ShowStudents() {
                             <p className="text-sm">{s.progress?.stage || 'Not started'}</p>
                             <p className="text-muted-foreground text-xs">{s.progress?.status || 'No defense request'}</p>
                         </TableCell>
-                        <TableCell>{s.progress?.enrollment_year ?? 'Not available'}</TableCell>
+                        <TableCell>{s.progress?.subject_enrollment || 'Not recorded'}</TableCell>
                         <TableCell>{s.progress?.completion_year ?? 'Not verified'}</TableCell>
                         <TableCell>
                             <Button asChild variant="outline" size="sm">
@@ -298,9 +308,21 @@ export default function ShowStudents() {
                                 >
                                     <option value="updated-desc">Progress updated: newest first</option>
                                     <option value="updated-asc">Progress updated: oldest first</option>
-                                    <option value="enrollment-desc">Enrollment year: newest first</option>
-                                    <option value="enrollment-asc">Enrollment year: oldest first</option>
+
                                     <option value="name">Name: A–Z</option>
+                                    <option value="program-asc">Program: A–Z</option>
+                                    <option value="program-desc">Program: Z–A</option>
+                                </select>
+                            </label>
+                            <label className="space-y-1 text-sm">
+                                Program
+                                <select className={selectClass} value={program} onChange={(e) => setProgram(e.target.value)}>
+                                    <option value="">All programs</option>
+                                    {choices.map(({ value, label }) => (
+                                        <option key={value} value={value}>
+                                            {label}
+                                        </option>
+                                    ))}
                                 </select>
                             </label>
                             <label className="space-y-1 text-sm">
@@ -317,20 +339,7 @@ export default function ShowStudents() {
                                     <option value="not-started">Not started</option>
                                 </select>
                             </label>
-                            <label className="space-y-1 text-sm">
-                                Enrollment year
-                                <select
-                                    className={selectClass}
-                                    value={filters.enrollment}
-                                    onChange={(e) => setFilters({ ...filters, enrollment: e.target.value })}
-                                >
-                                    <option value="">All enrollment years</option>
-                                    {years('enrollment_year').map((year) => (
-                                        <option key={year}>{year}</option>
-                                    ))}
-                                    <option value="unknown">Not available</option>
-                                </select>
-                            </label>
+
                             <label className="space-y-1 text-sm">
                                 Program completion year
                                 <select
@@ -339,7 +348,7 @@ export default function ShowStudents() {
                                     onChange={(e) => setFilters({ ...filters, completion: e.target.value })}
                                 >
                                     <option value="">All completion years</option>
-                                    {years('completion_year').map((year) => (
+                                    {completionYears.map((year) => (
                                         <option key={year}>{year}</option>
                                     ))}
                                     <option value="not-verified">Not verified</option>
@@ -377,16 +386,14 @@ export default function ShowStudents() {
                                 size="sm"
                                 onClick={() => {
                                     setFilters(defaultProgressFilters);
+                                    setProgram('');
                                     setQuery('');
                                 }}
                             >
                                 Reset filters
                             </Button>
                         </div>
-                        <p className="text-muted-foreground text-xs">
-                            Semester and subject filters use coordinator-recorded school information. Missing years appear last in either sort
-                            direction.
-                        </p>
+                        <p className="text-muted-foreground text-xs">Semester and subject filters use coordinator-recorded school information.</p>
                     </div>
                     <div className="border-border w-full max-w-full overflow-x-auto rounded-md border bg-white dark:border-zinc-700 dark:bg-zinc-900">
                         <Table>
@@ -398,7 +405,7 @@ export default function ShowStudents() {
                                     <TableHead className="dark:text-zinc-100">Program</TableHead>
                                     <TableHead className="dark:text-zinc-100">Program Coordinator</TableHead>
                                     <TableHead>Defense stage / status</TableHead>
-                                    <TableHead>Enrollment year</TableHead>
+                                    <TableHead>Subject enrollment</TableHead>
                                     <TableHead>Completion year</TableHead>
                                     <TableHead>Progress</TableHead>
                                 </TableRow>

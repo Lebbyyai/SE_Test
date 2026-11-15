@@ -73,7 +73,7 @@ class LoginRequest extends FormRequest
         // Explicit demo accounts use stored passwords, never school services.
         $demoAccounts = config('demo.accounts', []) + config('demo.finance_accounts', []);
         if (app()->environment(['local', 'testing'])) {
-            $demoAccounts += config('demo.local_student_accounts', []);
+            $demoAccounts += config('demo.local_student_accounts', []) + config('demo.local_staff_accounts', []);
         }
         if ((app()->environment(['local', 'testing']) || config('demo.hosted_enabled')) && array_key_exists(strtolower($identifier), $demoAccounts)) {
             $demo = User::where('email', strtolower($identifier))->where('is_demo_account', true)->first();

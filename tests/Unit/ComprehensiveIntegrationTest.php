@@ -43,12 +43,14 @@ beforeEach(function () {
         (require glob(database_path('migrations/*create_'.$table.'_table.php'))[0])->up();
     }
     (require database_path('migrations/2026_10_24_000002_add_exam_subject_schedule_fields.php'))->up();
+    (require database_path('migrations/2026_11_06_000001_add_registrar_approval_to_exam_applications.php'))->up();
+    (require database_path('migrations/2026_11_04_000004_create_student_responses_table.php'))->up();
     foreach (['Student', 'Student', 'Finance'] as $i => $role) {
-        DB::table('users')->insert(['id' => $i + 1, 'first_name' => 'Test', 'last_name' => 'User', 'school_id' => 'COMPRE-'.($i + 1), 'role' => $role, 'email' => 'compre'.($i + 1).'@example.test', 'email_verified_at' => now()]);
+        DB::table('users')->insert(['id' => $i + 1, 'first_name' => 'Test', 'last_name' => 'User', 'school_id' => 'COMPRE-'.($i + 1), 'role' => $role, 'program' => 'Master of Arts in Education', 'email' => 'compre'.($i + 1).'@example.test', 'email_verified_at' => now()]);
     }
 });
 afterEach(function () {
-    foreach (['exam_application_subject', 'exam_application', 'notifications', 'defense_requests', 'advisers', 'users'] as $t) {
+    foreach (['student_responses', 'exam_application_subject', 'exam_application', 'notifications', 'defense_requests', 'advisers', 'users'] as $t) {
         Schema::dropIfExists($t);
     }
 });

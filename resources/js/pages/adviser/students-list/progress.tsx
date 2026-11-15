@@ -20,7 +20,7 @@ type Subject = {
 type AcademicRecord = {
     classification: string | null;
     school_year: string | null;
-    enrollment_year: number | null;
+
     completion_year: number | null;
     semester: string | null;
     subjects: Subject[];
@@ -35,7 +35,7 @@ type AcademicRecord = {
         at: string;
         actor_name: string;
         record_reference: string;
-        enrollment_year: number | null;
+
         completion_year: number | null;
         semester: string | null;
     }[];
@@ -61,6 +61,7 @@ type Progress = {
     student: { id: number; name: string; school_id: string | null; email: string; program: string | null };
     stage: string | null;
     status: string;
+    subject_enrollment: string | null;
     record: AcademicRecord | null;
     defenses: Defense[];
     portal: { semester: string | null; synced_at: string | null; subjects: Subject[] };
@@ -90,7 +91,7 @@ export default function StudentProgressPage({
         version: record?.version ?? 0,
         classification: record?.classification ?? '',
         school_year: record?.school_year ?? '',
-        enrollment_year: record?.enrollment_year?.toString() ?? '',
+
         completion_year: record?.completion_year?.toString() ?? '',
         semester: record?.semester ?? '',
         subjects: (record?.subjects ?? []).map((subject) => ({
@@ -175,7 +176,7 @@ export default function StudentProgressPage({
                     {[
                         ['Current defense stage', progress.stage || 'No defense request'],
                         ['Defense status', progress.status],
-                        ['Enrollment year', record?.enrollment_year?.toString() || 'Not available'],
+                        ['Subject enrollment', progress.subject_enrollment || 'Not recorded'],
                         ['Program completion year', record?.completion_year?.toString() || 'Not verified'],
                     ].map(([title, value]) => (
                         <div key={title} className={section}>
@@ -246,8 +247,7 @@ export default function StudentProgressPage({
                         </div>
                     ) : (
                         <p className="text-muted-foreground mt-3 text-sm">
-                            No school-record information has been entered. Enrollment and completion years are not inferred from the student number or
-                            account creation date.
+                            No school-record information has been entered. Record the school year, semester, and subjects after verifying enrollment.
                         </p>
                     )}
                     {editing && canEdit && (
@@ -285,24 +285,14 @@ export default function StudentProgressPage({
                                     </select>
                                 </label>
                                 <label className="text-sm">
-                                    School year
+                                    Subject school year
                                     <Input
                                         placeholder="2026-2027"
                                         value={form.data.school_year}
                                         onChange={(e) => form.setData('school_year', e.target.value)}
                                     />
                                 </label>
-                                <label className="space-y-1 text-sm">
-                                    Enrollment year
-                                    <Input
-                                        type="number"
-                                        min={1900}
-                                        max={yearNow}
-                                        value={form.data.enrollment_year}
-                                        onChange={(event) => form.setData('enrollment_year', event.target.value)}
-                                        placeholder="Year first enrolled in this program"
-                                    />
-                                </label>
+
                                 <label className="space-y-1 text-sm">
                                     Program completion year (optional)
                                     <Input
@@ -316,17 +306,17 @@ export default function StudentProgressPage({
                                 </label>
                             </div>
                             <label className="block space-y-1 text-sm">
-                                Subject semester / school year
+                                Subject semester
                                 <Input
                                     value={form.data.semester}
                                     maxLength={150}
                                     onChange={(event) => form.setData('semester', event.target.value)}
-                                    placeholder="Example: 1st semester, 2026–2027"
+                                    placeholder="Example: 1st semester"
                                 />
                             </label>
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-sm font-medium">Subjects taking in that semester</h3>
+                                    <h3 className="text-sm font-medium">Subjects taken in that semester</h3>
                                     <Button
                                         type="button"
                                         size="sm"
@@ -543,9 +533,7 @@ export default function StudentProgressPage({
                                     <p>
                                         {entry.actor_name} · {readableDate(entry.at)}
                                     </p>
-                                    <p>
-                                        Enrollment: {entry.enrollment_year ?? 'Not available'} · Completion: {entry.completion_year ?? 'Not verified'}
-                                    </p>
+                                    <p>Program completion year: {entry.completion_year ?? 'Not verified'}</p>
                                     <p className="break-words whitespace-pre-wrap">{entry.record_reference}</p>
                                     <p>
                                         {entry.school_year} · {entry.semester} · {entry.classification}

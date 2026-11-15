@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Adviser;
+use App\Models\ComprehensiveExamSchedule;
 use App\Models\CoordinatorProgramAssignment;
 use App\Models\DefenseRequest;
 use App\Models\DefenseRequirement;
@@ -10,6 +11,7 @@ use App\Models\ExamApplication;
 use App\Models\HonorariumDisbursement;
 use App\Models\Panelist;
 use App\Models\PaymentSubmission;
+use App\Models\StudentResponse;
 use App\Models\User;
 use App\Services\CoordinatorProgramService;
 use App\Services\StudentProfileEnricher;
@@ -31,6 +33,90 @@ class DashboardController extends Controller
 
         if (in_array(strtolower(trim((string) $user->role)), ['finance', 'finance office', 'finance officer'], true)) {
             return redirect()->route('honorarium-workspace.index');
+        }
+
+        if ($user->role === 'Proctor') {
+            $assignedSchedules = ComprehensiveExamSchedule::query()
+                ->whereHas('proctorUsers', fn ($query) => $query->where('users.id', $user->id))
+                ->with('proctorUsers:id,first_name,last_name')
+                ->latest('exam_date')
+                ->latest('exam_time')
+                ->paginate(25)
+                ->through(fn (ComprehensiveExamSchedule $schedule) => [
+                    'id' => $schedule->id,
+                    'program' => $schedule->program,
+                    'exam_date' => $schedule->exam_date?->format('Y-m-d'),
+                    'exam_time' => $schedule->exam_time,
+                    'venue' => $schedule->venue,
+                    'teacher_assigned' => $schedule->teacher_assigned,
+                    'other_proctors' => $schedule->proctorUsers
+                        ->reject(fn (User $proctor) => $proctor->id === $user->id)
+                        ->map(fn (User $proctor) => $proctor->display_name)
+                        ->values(),
+                ]);
+
+            return Inertia::render('dashboard/Index', [
+                'auth' => [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->display_name,
+                        'role' => 'Proctor',
+                        'effective_role' => 'Proctor',
+                    ],
+                ],
+                'assignedSchedules' => $assignedSchedules,
+            ]);
+        }
+
+        if ($user->role === 'Registrar') {
+            return Inertia::render('dashboard/Index', [
+                'auth' => [
+                    'user' => [
+                        'id' => $user->id,
+                        'name' => $user->display_name,
+                        'role' => 'Registrar',
+                        'effective_role' => 'Registrar',
+                    ],
+                ],
+                'registrarApplications' => ExamApplication::query()
+                    ->with('subjects')
+                    ->where('registrar_approval_status', 'pending')
+                    ->latest('application_id')
+                    ->paginate(25, ['*'], 'registrar_page')
+                    ->withQueryString()
+                    ->through(function (ExamApplication $application) {
+                        $studentId = (string) $application->student_id;
+                        $student = User::query()
+                            ->where('school_id', $studentId)
+                            ->when(ctype_digit($studentId), fn ($query) => $query->orWhereKey((int) $studentId))
+                            ->first();
+                        $studentResponse = $student
+                            ? StudentResponse::query()->where('user_id', $student->id)->latest('id')->first()
+                            : null;
+
+                        return [
+                            'application_id' => $application->application_id,
+                            'student_name' => $student?->display_name ?? 'Student account not found',
+                            'student_email' => $student?->email,
+                            'student_id' => $student?->school_id ?? $application->student_id,
+                            'program' => $application->program,
+                            'school_year' => $application->school_year,
+                            'created_at' => $application->created_at,
+                            'aa_evaluated_at' => $studentResponse?->evaluated_at,
+                            'subjects' => $application->subjects->map(fn ($subject) => [
+                                'name' => $subject->subject_name,
+                                'date' => $subject->exam_date ? substr((string) $subject->exam_date, 0, 10) : null,
+                                'start_time' => $subject->start_time,
+                                'end_time' => $subject->end_time,
+                            ])->values(),
+                        ];
+                    }),
+                'evaluatedResponses' => StudentResponse::query()
+                    ->whereNotNull('evaluated_at')
+                    ->latest('evaluated_at')
+                    ->paginate(25, ['*'], 'response_page')
+                    ->withQueryString(),
+            ]);
         }
 
         // DATA SCRAPING REMOVED FROM LOGIN FLOW

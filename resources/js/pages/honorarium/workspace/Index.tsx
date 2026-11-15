@@ -266,6 +266,13 @@ export default function HonorariumWorkspace() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Honorarium Tracking" />
+            {['Coordinator', 'Administrative Assistant', 'Dean', 'Finance', 'Super Admin', 'SuperAdmin'].includes(role) && (
+                <div className="px-6 pt-4">
+                    <a className="inline-flex rounded-md border px-3 py-2 text-sm" href="/comprehensive-exam/assignments.csv">
+                        Download comprehensive exam faculty assignments (CSV)
+                    </a>
+                </div>
+            )}
             <main className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 p-4 md:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">

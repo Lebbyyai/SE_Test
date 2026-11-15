@@ -16,10 +16,10 @@ it('creates local program students with scoped assignments and preserves edits o
     expect($student->program)->toBe('Doctor in Business Management')->and(Hash::check('password', $student->password))->toBeTrue();
     $student->update(['first_name' => 'Edited Demo']);
     $this->seed(DemoProgramStudentsSeeder::class);
-    $this->assertDatabaseCount('users', 6);
+    $this->assertDatabaseCount('users', 8);
     expect($student->fresh()->first_name)->toBe('Edited Demo');
     foreach ([$adviser, $coordinator] as $reader) {
-        $this->actingAs($reader)->get('/academic-progress')->assertOk()->assertInertia(fn (Assert $p) => $p->has('students', 4));
+        $this->actingAs($reader)->get('/academic-progress')->assertOk()->assertInertia(fn (Assert $p) => $p->has('students', 6));
     }
     $this->assertDatabaseCount('defense_requests', 0);
     $this->assertDatabaseCount('student_progress_records', 0);
@@ -39,6 +39,8 @@ it('allows each new local student to sign in without contacting the school porta
     ['masterit@uic.edu.ph', 'Capstone', 11250],
     ['masterpharmacy@uic.edu.ph', 'Thesis', 11250],
     ['mastermba@uic.edu.ph', 'Business Plan', 11250],
+    ['demo.defense@uic.edu.ph', 'Thesis', 11250],
+    ['demo.defense2@uic.edu.ph', 'Thesis', 11250],
 ]);
 
 it('does not overwrite an existing non-demo account', function () {

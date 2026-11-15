@@ -1,9 +1,12 @@
 <?php
 
+use App\Models\DefenseAcademicOutcome;
 use App\Models\DefenseRequest;
 use App\Models\Panelist;
 use App\Models\User;
+use App\Services\DefenseAcademicProgress;
 use Illuminate\Support\Facades\Mail;
+use Inertia\Testing\AssertableInertia as Assert;
 
 function panelAvailabilityDefense(User $coordinator, array $attributes = []): DefenseRequest
 {
@@ -148,3 +151,62 @@ it('rejects custom times through scheduling and draft panel assignment', functio
     ])->assertUnprocessable()->assertJsonValidationErrors('scheduled_time');
     expect($this->current->fresh()->getAttributes())->toBe($before);
 })->with([['09:00', '11:00'], ['08:00', '12:00'], ['12:00', '14:00'], ['17:00', '19:00'], ['08:00', '10:15']]);
+
+it('carries the passed proposal panel into later stages and blocks conflicting slots or panel changes', function (string $stage) {
+    $panel = [
+        'defense_chairperson' => (string) $this->panel->id,
+        'defense_panelist1' => (string) $this->otherPanel->id,
+        'defense_panelist2' => null,
+        'defense_panelist3' => null,
+        'defense_panelist4' => null,
+    ];
+    $proposal = panelAvailabilityDefense($this->coordinator, $panel + [
+        'workflow_state' => 'completed', 'status' => 'Completed',
+        'scheduled_date' => '2026-01-10', 'scheduled_time' => '08:00', 'scheduled_end_time' => '10:00',
+    ])->fresh();
+    DefenseAcademicOutcome::create([
+        'defense_request_id' => $proposal->id, 'completion' => 'done', 'result' => 'passed',
+        'completed_on' => '2026-01-10', 'recorded_by' => $this->coordinator->id, 'version' => 1,
+        'snapshot_hash' => app(DefenseAcademicProgress::class)->snapshot($proposal),
+    ]);
+    $later = panelAvailabilityDefense($this->coordinator, [
+        'submitted_by' => $proposal->submitted_by, 'defense_type' => $stage,
+        'defense_panelist4' => 'Legacy extra member',
+    ]);
+    ($this->booking)();
+
+    $route = '/coordinator/defense-requests/'.$later->id;
+    $this->withoutVite()->actingAs($this->coordinator)->get($route.'/details')->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('proposalPanel.defense_chairperson', $this->panel->name)
+            ->where('proposalPanel.defense_panelist1', $this->otherPanel->name));
+    $this->getJson($route.'/panel-availability?'.http_build_query($this->slot))->assertOk()
+        ->assertJsonPath('proposal_panel_available', false);
+
+    $schedule = [
+        'scheduled_date' => $this->slot['date'], 'scheduled_time' => '08:00', 'scheduled_end_time' => '10:00',
+        'defense_mode' => 'online', 'defense_venue' => 'Fixture meeting',
+    ];
+    $override = ['defense_chairperson' => 'panelist-'.$this->otherPanel->id, 'defense_panelist1' => 'panelist-'.$this->panel->id];
+    $this->postJson($route.'/panels', $override)->assertUnprocessable()->assertJsonValidationErrors('panelists');
+    $this->postJson($route.'/schedule-json', $schedule + $override)->assertUnprocessable()->assertJsonValidationErrors('panelists');
+    $this->postJson($route.'/schedule-json', $schedule)->assertUnprocessable()->assertJsonValidationErrors('scheduled_time');
+    expect($later->fresh()->defense_chairperson)->toBeNull();
+
+    $schedule['scheduled_time'] = '10:00';
+    $schedule['scheduled_end_time'] = '12:00';
+    $this->postJson($route.'/schedule-json', $schedule)->assertOk();
+    $saved = $later->fresh();
+    expect($saved->only(array_keys($panel)))->toBe($panel)
+        ->and($saved->panels_assigned_at)->not->toBeNull()
+        ->and($saved->workflow_state)->toBe('scheduled');
+})->with(['Prefinal', 'Final']);
+
+it('blocks later-stage scheduling without a passed proposal for that student and program', function () {
+    $this->current->updateQuietly(['defense_type' => 'Prefinal']);
+    $this->actingAs($this->coordinator)->postJson('/coordinator/defense-requests/'.$this->current->id.'/schedule-json', [
+        'scheduled_date' => $this->slot['date'], 'scheduled_time' => '08:00', 'scheduled_end_time' => '10:00',
+        'defense_mode' => 'online', 'defense_venue' => 'Fixture meeting',
+    ])->assertUnprocessable()->assertJsonValidationErrors('panelists');
+    expect($this->current->fresh()->scheduled_date)->toBeNull();
+});

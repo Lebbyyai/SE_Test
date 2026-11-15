@@ -2,6 +2,8 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import { Head, usePage } from '@inertiajs/react';
 import React from 'react';
+import ProctorDashboard from './dashboard-layouts/proctor-dashboard';
+import RegistrarDashboard from './dashboard-layouts/registrar-dashboard';
 
 import AdviserDashboard from './dashboard-layouts/adviser-dashboard';
 import AssistantDashboard from './dashboard-layouts/assistant-dashboard';
@@ -33,6 +35,12 @@ export default function DashboardIndex() {
     const activeRole = user?.effective_role || user.role;
 
     switch (activeRole) {
+        case 'Registrar':
+            ComponentToRender = RegistrarDashboard;
+            break;
+        case 'Proctor':
+            ComponentToRender = ProctorDashboard;
+            break;
         case 'Student':
             ComponentToRender = StudentDashboard;
             break;

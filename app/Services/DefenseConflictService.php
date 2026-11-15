@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\ComprehensiveSession;
 use App\Models\DefenseRequest;
 use App\Models\Panelist;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class DefenseConflictService
@@ -88,6 +90,18 @@ class DefenseConflictService
             }
         }
 
+        if (Schema::hasTable('comprehensive_sessions')) {
+            $sessions = ComprehensiveSession::where('exam_date', $date)->where('start_time', '<', $endTime)->where('end_time', '>', $startTime)->get();
+            foreach ($sessions as $session) {
+                foreach ($session->faculty as $faculty) {
+                    $identity = $this->userIdentity($faculty['user_id']);
+                    if ($faculty['status'] !== 'declined' && isset($selected[$identity])) {
+                        $found[] = ['person' => 'A selected panelist or adviser', 'current_role' => $selected[$identity], 'conflicting_role' => 'Comprehensive exam '.$faculty['role'], 'defense_id' => null, 'student_name' => 'Comprehensive exam', 'time_range' => $session->start_time.' – '.$session->end_time];
+                    }
+                }
+            }
+        }
+
         return $found;
     }
 
@@ -115,7 +129,7 @@ class DefenseConflictService
             throw ValidationException::withMessages(['scheduled_end_time' => 'End time must be after start time.']);
         }
         if ($this->findPanelSchedulingConflicts($dr, [], $date, $dr->scheduled_time, $end)) {
-            throw ValidationException::withMessages(['scheduled_time' => 'A selected panelist or adviser has an overlapping defense.']);
+            throw ValidationException::withMessages(['scheduled_time' => 'A selected panelist or adviser has an overlapping defense or comprehensive exam.']);
         }
         if ($this->hasVenueConflict($dr, $dr->defense_venue, $date, $dr->scheduled_time, $end)) {
             throw ValidationException::withMessages(['defense_venue' => 'The venue is already booked during this time.']);

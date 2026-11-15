@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\LegacyAcademicRecord;
 use App\Models\LegacyClearanceStatus;
+use App\Services\ComprehensiveDocumentChecklist;
 use App\Services\LegacyPortalClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,16 @@ class ComprehensiveExamEligibilityController extends Controller
      * Check comprehensive exam eligibility
      */
     public function checkEligibility(Request $request): JsonResponse
+    {
+        $response = $this->portalEligibility($request);
+        if ($request->user() && $response->isSuccessful()) {
+            $response->setData(app(ComprehensiveDocumentChecklist::class)->apply($response->getData(true), $request->user()));
+        }
+
+        return $response;
+    }
+
+    private function portalEligibility(Request $request): JsonResponse
     {
         // Add debug logging to confirm API is being called
         Log::info('=== COMPREHENSIVE EXAM ELIGIBILITY API CALLED ===', [

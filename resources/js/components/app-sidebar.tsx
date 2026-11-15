@@ -31,6 +31,7 @@ const studentNavItems: MainNavItem[] = [
         icon: Send,
         subItems: [
             { title: 'Comprehensive Exam', href: '/comprehensive-exam' },
+            { title: 'Exam Documents', href: '/comprehensive-documents' },
             { title: 'Defense Requests', href: '/defense-requirements' },
         ],
     },
@@ -74,6 +75,7 @@ const coordinatorNavItems: MainNavItem[] = [
         icon: FileText,
         subItems: [
             { title: 'Comprehensive Exams', href: '/coordinator/compre-exam' },
+            { title: 'Exam Documents', href: '/comprehensive-documents' },
             { title: 'Payment Receipt', href: '/coordinator/compre-payment' },
         ],
     },
@@ -92,6 +94,7 @@ const assistantNavItems: MainNavItem[] = [
         icon: FileText,
         subItems: [
             { title: 'Comprehensive Exams', href: '/coordinator/compre-exam' },
+            { title: 'Exam Documents', href: '/comprehensive-documents' },
             { title: 'Exam Receipts', href: '/coordinator/compre-payment' },
             { title: 'Defense Receipts', href: '/aa/payment-verifications' },
         ],
@@ -108,6 +111,7 @@ const adviserNavItems: MainNavItem[] = [
 ];
 
 const deanNavItems: MainNavItem[] = [
+    { title: 'Exam Documents', href: '/comprehensive-documents', icon: FileText },
     { title: 'Dashboard', href: '/dashboard', icon: LayoutGrid },
     { title: 'Defense Requests', href: '/dean/defense-requests', icon: FileText },
     { title: 'Schedules', href: '/schedules', icon: CalendarFold },
@@ -123,6 +127,13 @@ export function AppSidebar() {
     let navItems: MainNavItem[];
 
     if (user.role === 'Super Admin' || user.role === 'SuperAdmin') {
+        navItems = [{ title: 'Dashboard', href: '/dashboard', icon: LayoutGrid }];
+    } else if (user.role === 'Registrar') {
+        navItems = [
+            { title: 'Dashboard', href: '/dashboard', icon: LayoutGrid },
+            { title: 'Exam Documents', href: '/comprehensive-documents', icon: FileText },
+        ];
+    } else if (user.role === 'Proctor') {
         navItems = [{ title: 'Dashboard', href: '/dashboard', icon: LayoutGrid }];
     } else if (user.role === 'Coordinator') {
         navItems = coordinatorNavItems;
@@ -168,6 +179,9 @@ export function AppSidebar() {
     if (['Coordinator', 'Adviser', 'Dean', 'Administrative Assistant'].includes(user.role))
         navItems.push({ title: 'Academic Progress', href: '/academic-progress', icon: Users });
     if (['Student', 'Administrative Assistant'].includes(user.role)) navItems.push({ title: 'Certificates', href: '/certificates', icon: FileText });
+
+    if (['Student', 'Administrative Assistant', 'Coordinator', 'Adviser', 'Registrar', 'Dean', 'Super Admin', 'SuperAdmin'].includes(user.role))
+        navItems.push({ title: 'Exam Workflow Archive', href: '/comprehensive-workflow', icon: GraduationCap });
 
     // Expanded menus state
     const [expandedMenus, setExpandedMenus] = useState<string[]>(() => {

@@ -38,6 +38,6 @@ class DemoProgramStudentsSeeder extends Seeder
                 }
             }
         });
-        $this->command?->info('Four program demo accounts are ready. Existing accounts are unchanged. No defense, grade, outcome or payment records were created.');
+        $this->command?->info(count($accounts).' local program demo accounts are ready. Existing accounts are unchanged. No defense, grade, outcome or payment records were created.');
     }
 }

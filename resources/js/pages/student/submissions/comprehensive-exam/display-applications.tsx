@@ -48,6 +48,18 @@ function statusBadge(status?: string) {
                     <XCircle size={14} /> Rejected
                 </Badge>
             );
+        case 'registrar_pending':
+            return (
+                <Badge className="gap-1 border border-amber-200 bg-amber-100 text-amber-800">
+                    <Hourglass size={14} /> Awaiting Registrar approval
+                </Badge>
+            );
+        case 'aa_pending':
+            return (
+                <Badge className="gap-1 border border-amber-200 bg-amber-100 text-amber-800">
+                    <Hourglass size={14} /> Awaiting Administrative Assistant approval
+                </Badge>
+            );
         default:
             return (
                 <Badge className="gap-1 border border-gray-200 bg-gray-100 text-gray-700">

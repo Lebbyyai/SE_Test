@@ -88,6 +88,32 @@ it('requires verification a record reference and valid academic years', function
     $this->assertDatabaseCount('student_progress_records', 0);
 });
 
+it('shows the subject school year and semester to all authorized academic roles', function () {
+    $payload = [
+        'version' => 0, 'school_year' => '2025-2026', 'semester' => '1st semester',
+        'subjects' => [['title' => 'Thesis 1', 'research_subject' => 'Thesis 1', 'started_on' => '2025-08-01']],
+        'record_reference' => 'Checked official subject enrollment record.', 'verified_against_school_records' => true,
+    ];
+    $this->actingAs($this->coordinator)->put($this->url, $payload)->assertRedirect();
+    $this->put($this->url, array_replace($payload, [
+        'version' => 1, 'completion_year' => 2025, 'semester' => '2nd semester',
+        'subjects' => [['title' => 'Thesis 2', 'research_subject' => 'Thesis 2', 'started_on' => '2025-12-01']],
+    ]))->assertRedirect();
+
+    $label = '2nd semester (2025-2026) - Thesis 2';
+    foreach ([$this->coordinator, $this->adviser, User::factory()->create(['role' => 'Dean']), User::factory()->create(['role' => 'Administrative Assistant'])] as $reader) {
+        $this->actingAs($reader)->get('/academic-progress')->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('students.0.progress.subject_enrollment', $label));
+        $this->get($this->url)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('progress.subject_enrollment', $label)
+            ->where('progress.record.enrollment_year', null)
+            ->where('progress.record.completion_year', 2025)
+            ->where('progress.record.history.0.semester', '1st semester')
+            ->where('progress.record.history.0.subjects.0.research_subject', 'Thesis 1')
+            ->where('canEdit', $reader->id === $this->coordinator->id));
+    }
+});
+
 it('allows missing academic values without fabricating completion', function () {
     $this->actingAs($this->coordinator)->put($this->url, [
         'version' => 0, 'subjects' => [], 'record_reference' => 'School records requested; no year or subjects confirmed.', 'verified_against_school_records' => true,

@@ -60,7 +60,7 @@ it('allows Super Admin to assign supported roles and synchronizes all role repre
     expect($user->role_manually_assigned)->toBeTrue();
     expect(DB::table('roles')->where('id', $user->role_id)->value('name'))->toBe($role);
     expect($user->roles()->pluck('name')->all())->toBe([$role]);
-})->with(['Student', 'Adviser', 'Coordinator', 'Administrative Assistant', 'Dean']);
+})->with(['Student', 'Adviser', 'Coordinator', 'Administrative Assistant', 'Dean', 'Registrar']);
 
 it('rejects unauthenticated role changes', function () {
     $user = roleTestAccount('Student', 'user@example.test');
@@ -81,7 +81,7 @@ it('rejects unsupported and privileged role payloads', function (string $role) {
     $this->actingAs($admin)->patchJson('/admin/users/'.$user->id.'/role', ['role' => $role])
         ->assertUnprocessable()->assertJsonValidationErrors('role');
     expect($user->fresh()->role)->toBe('Student');
-})->with(['Super Admin', 'SuperAdmin', 'Faculty', 'Registrar', 'Owner', '']);
+})->with(['Super Admin', 'SuperAdmin', 'Faculty', 'Owner', '']);
 
 it('protects the current Super Admin account from demotion', function () {
     $admin = roleTestAccount('Super Admin', 'admin@example.test');

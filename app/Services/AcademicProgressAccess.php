@@ -21,7 +21,7 @@ class AcademicProgressAccess
         abort_unless($actor->role === 'Coordinator', 403);
 
         return $query->where(function ($q) use ($actor) {
-            $q->whereIn('id', DefenseRequest::where('coordinator_user_id', $actor->id)->select('submitted_by'))
+            $q->whereIn('program', $actor->allowedProgramNames())->orWhereIn('id', DefenseRequest::where('coordinator_user_id', $actor->id)->select('submitted_by'))
                 ->orWhereIn('id', DB::table('adviser_student')->where('requested_by', $actor->id)->select('student_id'));
         });
     }

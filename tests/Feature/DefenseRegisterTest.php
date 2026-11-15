@@ -7,6 +7,7 @@ use App\Models\FinanceDocumentSubmission;
 use App\Models\HonorariumDisbursement;
 use App\Models\Panelist;
 use App\Models\PaymentRate;
+use App\Models\StudentProgressRecord;
 use App\Models\User;
 use App\Services\DefenseRegisterExport;
 use App\Services\DefenseServiceConfirmation;
@@ -79,6 +80,76 @@ test('coordinators only see assigned defenses and exports enforce that same scop
     $foreign->saveQuietly();
     $this->actingAs($users['coordinator'])->get('/defense-register')->assertOk()->assertInertia(fn (Assert $page) => $page->has('items', 1)->where('items.0.id', $defense->id));
     $this->get('/defense-register/print')->assertOk()->assertDontSee('FOREIGN PRIVATE TITLE');
+});
+
+test('Dean and AA can filter one date by defense stage and export the matching sessions', function () {
+    [$proposal, $users] = registerFixture();
+    foreach ([
+        ['Pre-final', 'Prefinal Study', '2026-10-25', 'Approved'],
+        ['Final', 'Final Study', '2026-10-25', 'Approved'],
+        ['Pre Final', 'Different Day', '2026-10-26', 'Approved'],
+        ['Prefinal', 'Cancelled Session', '2026-10-25', 'Cancelled'],
+    ] as [$type, $title, $date, $status]) {
+        $copy = $proposal->replicate()->fill([
+            'defense_type' => $type, 'thesis_title' => $title, 'scheduled_date' => $date, 'status' => $status,
+        ]);
+        $copy->saveQuietly();
+    }
+
+    $day = 'from=2026-10-25&to=2026-10-25';
+    $dean = User::factory()->create(['role' => 'Dean']);
+    foreach ([$dean, $users['aa']] as $reader) {
+        $this->actingAs($reader)->get('/defense-register?'.$day)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('items', 3)->where('stage', '')->where('from', '2026-10-25')->where('to', '2026-10-25'));
+
+        foreach (['proposal' => 'Example Study', 'prefinal' => 'Prefinal Study', 'final' => 'Final Study'] as $stage => $title) {
+            $this->get('/defense-register?'.$day.'&stage='.$stage)->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->where('stage', $stage)->has('items', 1)->where('items.0.title', $title)
+                ->where('items.0.student', $users['student']->full_name)
+                ->where('items.0.date', '2026-10-25')->where('items.0.start', '09:00')->where('items.0.end', '10:00')
+                ->where('items.0.participants.0.recipient_name', 'Test Chair')
+                ->where('items.0.participants.1.recipient_name', 'Test Member'));
+        }
+
+        $this->get('/defense-register/print?'.$day.'&stage=prefinal')->assertOk()
+            ->assertSee('Prefinal Study')->assertDontSee('Final Study')->assertDontSee('Different Day');
+        $csv = $this->get('/defense-register/csv?'.$day.'&stage=prefinal')->assertOk()->streamedContent();
+        expect($csv)->toContain('Prefinal Study')->not->toContain('Example Study', 'Different Day', 'Cancelled Session');
+    }
+
+    $this->getJson('/defense-register?'.$day.'&stage=invalid')->assertUnprocessable()->assertJsonValidationErrors('stage');
+});
+
+test('filters one panelist by date and defense type for Dean, AA and the assigned coordinator', function () {
+    [$defense, $users] = registerFixture();
+    StudentProgressRecord::create([
+        'student_id' => $users['student']->id, 'semester' => '1st semester', 'school_year' => '2026-2027',
+        'subjects' => [['title' => 'Thesis 1', 'research_subject' => 'Thesis 1']],
+        'record_reference' => 'Verified test enrollment', 'recorded_at' => now(),
+    ]);
+    foreach ([
+        ['Prefinal', 'Other stage', '2026-10-25', $defense->defense_panelist1],
+        ['Proposal', 'Other day', '2026-10-24', $defense->defense_panelist1],
+        ['Proposal', 'Other panel', '2026-10-25', null],
+    ] as [$type, $title, $date, $member]) {
+        $defense->replicate()->fill([
+            'submitted_by' => User::factory()->create(['role' => 'Student'])->id,
+            'defense_type' => $type, 'thesis_title' => $title, 'scheduled_date' => $date, 'defense_panelist1' => $member,
+        ])->saveQuietly();
+    }
+    $query = '?from=2026-10-25&to=2026-10-25&stage=proposal&panelist='.$defense->defense_panelist1;
+    foreach ([User::factory()->create(['role' => 'Dean']), $users['aa'], $users['coordinator']] as $reader) {
+        $this->actingAs($reader)->get('/defense-register'.$query)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('canReviewPanelAssignments', true)->has('items', 1)->where('items.0.id', $defense->id)
+            ->where('items.0.student', $users['student']->full_name)->where('items.0.current_stage', 'Proposal')
+            ->where('items.0.subject_enrollment', '1st semester (2026-2027) - Thesis 1')
+            ->where('items.0.participants.1.recipient_name', 'Test Member'));
+        $csv = $this->get('/defense-register/csv'.$query)->assertOk()->streamedContent();
+        expect($csv)->toContain('Example Study', 'Test Member', 'Thesis 1')->not->toContain('Other stage', 'Other day', 'Other panel');
+    }
+    $this->actingAs($users['other'])->get('/defense-register'.$query)->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->has('items', 0)->has('panelists', 0));
+    $this->actingAs($users['finance'])->getJson('/defense-register'.$query)->assertForbidden();
 });
 
 test('register rejects inverted and excessively large export date ranges', function () {
@@ -202,6 +273,10 @@ test('exports preserve parallel sessions and store user text literally without f
     $parallel = $defense->replicate();
     $parallel->thesis_title = 'Parallel session';
     $parallel->saveQuietly();
+    $longer = $defense->replicate();
+    $longer->thesis_title = 'Same start, different end';
+    $longer->scheduled_end_time = '11:00';
+    $longer->saveQuietly();
     $this->actingAs($users['coordinator']);
     $request = Request::create('/defense-register');
     $request->setUserResolver(fn () => $users['coordinator']);
@@ -214,6 +289,12 @@ test('exports preserve parallel sessions and store user text literally without f
         expect($matrix)->toContain('Parallel session')->toContain('HYPERLINK')->not->toContain('<f>');
         $xml = new DOMDocument;
         expect($xml->loadXML($matrix))->toBeTrue();
+        $xpath = new DOMXPath($xml);
+        $xpath->registerNamespace('s', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+        expect($xpath->evaluate('string(//s:c[@r="A5"])'))->toBe("09:00–10:00\nDefense")
+            ->and($xpath->evaluate('string(//s:c[@r="A9"])'))->toBe("09:00–11:00\nDefense")
+            ->and($xpath->evaluate('string(//s:c[@r="B5"])'))->toContain('Parallel session')->not->toContain('Same start, different end')
+            ->and($xpath->evaluate('string(//s:c[@r="B9"])'))->toContain('Same start, different end');
         $details = $zip->getFromName('xl/worksheets/sheet2.xml');
         expect($details)->toContain('TEST-123')->toContain('s="1"');
         $zip->close();
@@ -226,7 +307,8 @@ test('exports preserve parallel sessions and store user text literally without f
 
 test('print report escapes titles and clearly labels unclassified panelists', function () {
     [, $users] = registerFixture(['thesis_title' => '<script>bad()</script>']);
-    $this->actingAs($users['aa'])->get('/defense-register/print')->assertOk()->assertSee('&lt;script&gt;bad()&lt;/script&gt;', false)->assertDontSee('<script>bad()</script>', false)->assertSee('Unclassified panel');
+    $this->actingAs($users['aa'])->get('/defense-register/print')->assertOk()->assertSee('&lt;script&gt;bad()&lt;/script&gt;', false)->assertDontSee('<script>bad()</script>', false)->assertSee('Unclassified panel')
+        ->assertSee('<th>09:00–10:00<br>Defense</th>', false);
 });
 
 test('an ongoing defense cannot be marked completed before its end time', function () {

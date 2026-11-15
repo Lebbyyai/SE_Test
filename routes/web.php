@@ -8,11 +8,14 @@ use App\Http\Controllers\AdviserStudentController;
 use App\Http\Controllers\AdviserStudentProgressController;
 use App\Http\Controllers\Api\ComprehensiveExamEligibilityController;
 use App\Http\Controllers\Api\StudentSearchController;
+use App\Http\Controllers\ComprehensiveDocumentController;
 use App\Http\Controllers\ComprehensiveExamController;
 use App\Http\Controllers\ComprehensiveExamResultController;
+use App\Http\Controllers\ComprehensiveWorkflowController;
 use App\Http\Controllers\CoordinatorAdviserController;
 use App\Http\Controllers\CoordinatorCompreExamController;
 use App\Http\Controllers\CoordinatorComprePaymentController;
+use App\Http\Controllers\CoordinatorCompreScheduleController;
 use App\Http\Controllers\CoordinatorDefenseController;
 use App\Http\Controllers\CoordinatorProgramAssignmentController;
 use App\Http\Controllers\DashboardController;
@@ -38,10 +41,12 @@ use App\Http\Controllers\PanelistController;
 use App\Http\Controllers\PanelistHonorariumSpecController;
 use App\Http\Controllers\PaymentRateController;
 use App\Http\Controllers\PaymentSubmissionController;
+use App\Http\Controllers\RegistrarExamApprovalController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\ScheduleEventController;
 use App\Http\Controllers\StudentDocumentController;
 use App\Http\Controllers\StudentRecordController;
+use App\Http\Controllers\StudentResponseController;
 use App\Http\Controllers\SystemStatusController;
 use App\Http\Controllers\UserSignatureController;
 use App\Mail\AdviserInvitation;
@@ -49,7 +54,9 @@ use App\Models\AaPaymentVerification;
 use App\Models\DefenseRequest;
 use App\Models\DocumentTemplate;
 use App\Models\User;
+use App\Services\DefenseSchedulingService;
 use App\Services\HonorariumAccess;
+use App\Services\StudentProgressService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -358,7 +365,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/panelists/bulk-delete', [PanelistController::class, 'bulkDelete'])->name('panelists.bulk-delete');
     Route::post('/panelists/bulk-status', [PanelistController::class, 'bulkUpdateStatus'])->name('panelists.bulk-status');
 
+    Route::get('/comprehensive-documents', [ComprehensiveDocumentController::class, 'index'])->name('comprehensive-documents.index');
+    Route::post('/comprehensive-documents/{student}/{type}/upload', [ComprehensiveDocumentController::class, 'upload'])->name('comprehensive-documents.upload');
+    Route::patch('/comprehensive-documents/{student}/{type}/requirement', [ComprehensiveDocumentController::class, 'requirement'])->name('comprehensive-documents.requirement');
+    Route::patch('/comprehensive-documents/{student}/{type}/review', [ComprehensiveDocumentController::class, 'review'])->name('comprehensive-documents.review');
+    Route::get('/comprehensive-documents/{student}/{type}/download', [ComprehensiveDocumentController::class, 'download'])->name('comprehensive-documents.download');
+
+    Route::get('/comprehensive-workflow', [ComprehensiveWorkflowController::class, 'index'])->name('comprehensive-workflow.index');
+    Route::get('/comprehensive-workflow/export', [ComprehensiveWorkflowController::class, 'export']);
+    Route::get('/comprehensive-receipts/{payment}', [PaymentSubmissionController::class, 'download']);
+
     /* Comprehensive Exam (student) */
+    Route::post('/registrar/comprehensive-exam/{application}/approve', [RegistrarExamApprovalController::class, 'approve'])->name('registrar.comprehensive-exam.approve');
+    Route::get('/comprehensive-exam/assignments.csv', [CoordinatorCompreScheduleController::class, 'export'])->name('comprehensive-exam.assignments');
+    Route::get('/coordinator/compre-schedule', [CoordinatorCompreScheduleController::class, 'index'])->name('coordinator.compre-schedule.index');
+    Route::post('/coordinator/compre-schedule', [CoordinatorCompreScheduleController::class, 'store'])->name('coordinator.compre-schedule.store');
+    Route::put('/coordinator/compre-schedule/{schedule}', [CoordinatorCompreScheduleController::class, 'update'])->name('coordinator.compre-schedule.update');
+    Route::post('/coordinator/compre-payment/{id}/exam-permit', [CoordinatorComprePaymentController::class, 'setExamPermit'])->name('coordinator.compre-payment.exam-permit');
+    Route::get('/payment-submissions/{payment}/receipt', [PaymentSubmissionController::class, 'download'])->name('payment-submissions.receipt');
+    Route::post('/aa/responses/{studentResponse}/evaluate', [StudentResponseController::class, 'evaluate'])->name('assistant.responses.evaluate');
+    Route::get('/dean/responses', [StudentResponseController::class, 'deanIndex'])->name('dean.responses.index');
+
     Route::get('/comprehensive-exam', [ComprehensiveExamController::class, 'index'])->name('comprehensive-exam.index');
     Route::post('/comprehensive-exam', [ComprehensiveExamController::class, 'store'])->name('comprehensive-exam.store');
 
@@ -499,6 +526,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return Inertia::render('coordinator/submissions/defense-request/details', [
                 'defenseRequest' => $mapped,
                 'userRole' => $user->role,
+                'proposalPanel' => app(DefenseSchedulingService::class)->proposalPanel($defenseRequest)?->panel_display,
             ]);
         })->name('defense-requests.details');
     });
@@ -506,8 +534,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Profile and its legacy alias are registered in settings.php.
 
     // Add this route for the adviser students list page
-    Route::get('/adviser/students-list', function () {
-        return Inertia::render('adviser/students-list/Index');
+    Route::get('/adviser/students-list', function (StudentProgressService $service) {
+        return Inertia::render('adviser/students-list/Index', ['programCatalog' => $service->programCatalog()]);
     })->name('adviser.students-list');
 
     // Add this line if missing

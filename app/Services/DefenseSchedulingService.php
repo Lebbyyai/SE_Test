@@ -26,9 +26,35 @@ class DefenseSchedulingService
         abort_unless($user && $user->role === 'Coordinator' && (int) $dr->coordinator_user_id === (int) $user->id, 403);
     }
 
+    public function locksPanel(DefenseRequest $request): bool
+    {
+        return in_array(strtolower((string) $request->defense_type), ['prefinal', 'pre-final', 'final'], true);
+    }
+
+    public function proposalPanel(DefenseRequest $request, bool $lock = false): ?DefenseRequest
+    {
+        if (! $this->locksPanel($request) || ! $request->submitted_by || ! filled($request->program)) {
+            return null;
+        }
+
+        $query = DefenseRequest::where('submitted_by', $request->submitted_by)
+            ->where('program', $request->program)
+            ->whereRaw('LOWER(defense_type) = ?', ['proposal'])
+            ->where('id', '<', $request->id)
+            ->latest('id');
+
+        $proposal = ($lock ? $query->lockForUpdate() : $query)->first();
+
+        return $proposal && $proposal->defense_chairperson && $proposal->defense_panelist1
+            && app(DefenseAcademicProgress::class)->eligible($proposal) ? $proposal : null;
+    }
+
     public function persist(DefenseRequest $request, array $data, User $user, bool $schedule): DefenseRequest
     {
         return DB::transaction(function () use ($request, $data, $user, $schedule) {
+            if (Schema::hasTable('comprehensive_workflow_locks')) {
+                app(ComprehensiveWorkflowService::class)->lock();
+            }
             if (Schema::hasTable('defense_schedule_mutex')) {
                 DB::table('defense_schedule_mutex')->where('id', 1)->lockForUpdate()->first();
             }
@@ -44,6 +70,22 @@ class DefenseSchedulingService
                 $this->assertTimeSlot($data['availability_time'] ?? null, $data['availability_end_time'] ?? null);
             }
             $from = $dr->workflow_state;
+            if ($this->locksPanel($dr)) {
+                if (! $schedule || array_intersect(DefenseConflictService::PANEL_FIELDS, array_keys($data))) {
+                    throw ValidationException::withMessages(['panelists' => 'This stage uses the Proposal Defense panel. Only the schedule can be changed.']);
+                }
+                $proposal = $this->proposalPanel($dr, lock: true);
+                if (! $proposal) {
+                    throw ValidationException::withMessages(['panelists' => 'A completed and passed Proposal Defense with an assigned chairperson and panel member is required before scheduling.']);
+                }
+
+                $dr->fill($proposal->only(DefenseConflictService::PANEL_FIELDS));
+                if ($dr->isDirty(DefenseConflictService::PANEL_FIELDS) || ! $dr->panels_assigned_at) {
+                    $dr->panels_assigned_at = now();
+                    $dr->panels_assigned_by = $user->id;
+                    $dr->addWorkflowEntry('panels-assigned', 'Panel carried over from Proposal Defense #'.$proposal->id.'.', $user->id, $from, $from);
+                }
+            }
             foreach (DefenseConflictService::PANEL_FIELDS as $field) {
                 if (array_key_exists($field, $data) && $data[$field]) {
                     $value = (string) $data[$field];

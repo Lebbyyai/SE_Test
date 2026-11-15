@@ -7,6 +7,7 @@ use App\Models\DefenseRequest;
 use App\Models\DefenseServiceRecord;
 use App\Models\LegacyGradesData;
 use App\Models\LegacyScrapedData;
+use App\Models\ProgramRecord;
 use App\Models\StudentProgressRecord;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -44,6 +45,33 @@ class StudentProgressService
             ?? $requests->first();
     }
 
+    public function programCatalog(): array
+    {
+        return ProgramRecord::whereIn('category', ['Masters', 'Doctorate'])
+            ->get(['name', 'program'])
+            ->map(fn (ProgramRecord $program) => ['name' => $program->name, 'code' => $program->program])
+            ->all();
+    }
+
+    private function subjectEnrollment(?StudentProgressRecord $record): ?string
+    {
+        $semester = trim($record?->semester ?? '');
+        $schoolYear = $record?->school_year;
+        $subjects = collect($record?->subjects ?? [])
+            ->map(fn ($subject) => trim(($subject['research_subject'] ?? '') ?: ($subject['title'] ?? '')))
+            ->filter()->unique()->implode(', ');
+
+        if ($semester === '' || $subjects === '') {
+            return null;
+        }
+
+        if ($schoolYear && ! str_contains(str_replace(['–', '—'], '-', $semester), $schoolYear)) {
+            $semester .= ' ('.$schoolYear.')';
+        }
+
+        return $semester.' - '.$subjects;
+    }
+
     public function summaries(Collection $students): array
     {
         $ids = $students->modelKeys();
@@ -63,6 +91,7 @@ class StudentProgressService
                 'stage' => ($outcomeCurrent ? $outcome?->next_stage : null) ?: $this->stage($current?->defense_type),
                 'status' => $current ? $this->status($current, in_array($current->id, $held, true)) : 'No defense request',
                 'enrollment_year' => $record?->enrollment_year, 'completion_year' => $record?->completion_year,
+                'subject_enrollment' => $this->subjectEnrollment($record),
                 'missed_defenses' => $outcomes->whereIn('defense_request_id', $requests->get($student->id, collect())->pluck('id'))->filter(fn ($entry) => $entry->completion === 'did-not-defend' || collect($entry->history ?? [])->contains(fn ($prior) => ($prior['completion'] ?? '') === 'did-not-defend'))->count(),
                 'classification' => $record?->classification, 'school_year' => $record?->school_year, 'completion' => $outcomeCurrent ? $outcome?->completion : null, 'result' => $outcomeCurrent ? $outcome?->result : null, 'semester' => $record?->semester,
                 'subjects' => collect($record?->subjects ?? [])->map(fn ($subject) => collect($subject)->only(['code', 'title'])->all())->values()->all(),
@@ -106,6 +135,7 @@ class StudentProgressService
                 'email' => $student->email, 'program' => $student->program],
             'stage' => ($current && app(DefenseAcademicProgress::class)->current($current, $outcomes->get($current->id)) ? $outcomes->get($current->id)?->next_stage : null) ?: $this->stage($current?->defense_type),
             'status' => $current ? $this->status($current, $services->has($current->id)) : 'No defense request',
+            'subject_enrollment' => $this->subjectEnrollment($record),
             'record' => $record ? [
                 'classification' => $record->classification, 'school_year' => $record->school_year, 'enrollment_year' => $record->enrollment_year, 'completion_year' => $record->completion_year,
                 'semester' => $record->semester, 'subjects' => $record->subjects ?? [], 'record_reference' => $record->record_reference,

@@ -12,7 +12,7 @@ class PaymentSubmission extends Model
     protected $primaryKey = 'payment_id';
 
     protected $fillable = [
-        'student_id',
+        'student_id', 'exam_application_id',
         'or_number',
         'amount_paid',
         'payment_date',

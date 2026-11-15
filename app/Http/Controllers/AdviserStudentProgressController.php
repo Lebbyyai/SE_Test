@@ -26,7 +26,10 @@ class AdviserStudentProgressController extends Controller
         $students = app(AcademicProgressAccess::class)->students($request->user())->orderBy('last_name')->get();
         $summaries = $service->summaries($students);
 
-        return Inertia::render('academic-progress/Index', ['students' => $students->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'program' => $s->program, 'progress' => $summaries[$s->id] ?? null])->values()]);
+        return Inertia::render('academic-progress/Index', [
+            'students' => $students->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'program' => $s->program, 'progress' => $summaries[$s->id] ?? null])->values(),
+            'programCatalog' => $service->programCatalog(),
+        ]);
     }
 
     public function show(Request $request, User $student, StudentProgressService $service)
@@ -52,10 +55,7 @@ class AdviserStudentProgressController extends Controller
             'subjects.*.code' => 'nullable|string|max:40', 'subjects.*.title' => 'required|string|max:200',
             'record_reference' => 'required|string|min:5|max:1500', 'verified_against_school_records' => 'required|accepted',
         ]);
-        $data += ['enrollment_year' => null, 'completion_year' => null, 'semester' => null, 'classification' => null, 'school_year' => null];
-        if ($data['completion_year'] !== null && ($data['enrollment_year'] === null || $data['completion_year'] < $data['enrollment_year'])) {
-            throw ValidationException::withMessages(['completion_year' => 'Enter an enrollment year, and choose a completion year on or after it.']);
-        }
+        $data += ['completion_year' => null, 'semester' => null, 'classification' => null, 'school_year' => null];
         if ($data['subjects'] && ! filled($data['semester'])) {
             throw ValidationException::withMessages(['semester' => 'Enter the semester or school year for these subjects.']);
         }
@@ -77,6 +77,10 @@ class AdviserStudentProgressController extends Controller
             if (($record?->version ?? 0) !== (int) $data['version']) {
                 throw ValidationException::withMessages(['version' => 'This record changed while you were editing. Reload the page before saving again.']);
             }
+            $enrollmentYear = array_key_exists('enrollment_year', $data) ? $data['enrollment_year'] : $record?->enrollment_year;
+            if ($data['completion_year'] !== null && $enrollmentYear !== null && $data['completion_year'] < $enrollmentYear) {
+                throw ValidationException::withMessages(['completion_year' => 'Choose a completion year on or after the recorded program start year.']);
+            }
             $history = $record?->history ?? [];
             if ($record) {
                 $history[] = [
@@ -88,7 +92,7 @@ class AdviserStudentProgressController extends Controller
             }
             $record ??= new StudentProgressRecord(['student_id' => $student->id]);
             $record->fill([
-                'enrollment_year' => $data['enrollment_year'], 'completion_year' => $data['completion_year'],
+                'enrollment_year' => $enrollmentYear, 'completion_year' => $data['completion_year'],
                 'classification' => $data['classification'], 'school_year' => $data['school_year'], 'semester' => $data['semester'], 'subjects' => collect($data['subjects'])->map(fn ($subject) => ['code' => trim($subject['code'] ?? ''), 'title' => trim($subject['title']), 'research_subject' => $subject['research_subject'] ?? null, 'started_on' => $subject['started_on'] ?? null, 'school_year' => $data['school_year'], 'semester' => $data['semester']])->values()->all(),
                 'record_reference' => trim($data['record_reference']), 'recorded_by' => $request->user()->id,
                 'recorded_at' => now(), 'version' => $record->exists ? $record->version + 1 : 1, 'history' => $history,

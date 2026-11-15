@@ -15,7 +15,14 @@ class ExamApplication extends Model
 
     public $timestamps = false;
 
+    protected $casts = [
+        'registrar_approved_at' => 'datetime',
+    ];
+
     protected $fillable = [
+        'registrar_approval_status',
+        'registrar_approved_at',
+        'registrar_approved_by',
         'student_id',
         'school_year',
         'permit_status',
@@ -31,6 +38,11 @@ class ExamApplication extends Model
         'program',
         'created_at',
     ];
+
+    public function workflow()
+    {
+        return $this->hasOne(ComprehensiveWorkflow::class, 'application_id', 'application_id');
+    }
 
     public function subjects(): HasMany
     {

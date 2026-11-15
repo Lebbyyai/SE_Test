@@ -11,6 +11,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 type PageProps = {
     student: { name: string; program: string | null; email?: string | null };
     canSubmit: boolean;
+    approvalStatus: 'not_submitted' | 'registrar_pending' | 'aa_pending' | 'approved' | 'rejected';
     payment: {
         payment_id: number;
         or_number: string;
@@ -32,7 +33,7 @@ const SIM_DEFAULTS = {
 
 export default function Index() {
     const { props } = usePage<PageProps>();
-    const { student, canSubmit, payment } = props;
+    const { student, canSubmit, approvalStatus, payment } = props;
 
     // DEV: read optional overrides from the query string (?pay_can=1&pay_debug=1)
     const devOverrides = useMemo(() => {
@@ -77,6 +78,19 @@ export default function Index() {
                             <div>
                                 <span className="text-base font-semibold">Comprehensive Exam Payment</span>
                                 <p className="text-muted-foreground block text-xs">Submit your official receipt for verification.</p>
+                                {!canSubmit && (
+                                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                                        {approvalStatus === 'not_submitted'
+                                            ? 'Submit your comprehensive exam application first.'
+                                            : approvalStatus === 'rejected'
+                                              ? 'Your application was not approved. Contact the Graduate School for assistance.'
+                                              : approvalStatus === 'registrar_pending'
+                                                ? 'Payment will be available after the Registrar reviews your application.'
+                                                : approvalStatus === 'aa_pending'
+                                                  ? 'The Registrar approved your application. Payment will be available after the Administrative Assistant approves it.'
+                                                  : 'Payment will be available after both the Registrar and Administrative Assistant approve your application.'}
+                                    </p>
+                                )}
                                 <div className="mt-1 text-xs">{statusBadge}</div>
                             </div>
                         </div>
@@ -87,13 +101,13 @@ export default function Index() {
                             disabled={!canOpenForm && !devOverrides.debugOpen} // DEV: allow force-open
                             title={
                                 canOpenForm || devOverrides.debugOpen
-                                    ? 'Submit payment'
+                                    ? 'Add receipt'
                                     : !effectiveCanSubmit
-                                      ? 'You can submit payment only after your comprehensive application is approved.'
+                                      ? 'You can submit payment only after Registrar and Administrative Assistant approval.'
                                       : 'Payment already submitted'
                             }
                         >
-                            Submit payment
+                            Add receipt
                         </Button>
                     </div>
 

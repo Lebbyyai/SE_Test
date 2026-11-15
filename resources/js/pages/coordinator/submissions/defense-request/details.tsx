@@ -59,6 +59,7 @@ type PanelMemberOption = {
 
 type Availability = {
     key: string;
+    proposal_panel_available: boolean | null;
     options: PanelMemberOption[];
     adviser: { is_available: boolean; bookings: { start: string; end: string; overlaps: boolean }[] } | null;
 };
@@ -125,6 +126,7 @@ type PaymentRateRow = {
 interface PageProps {
     defenseRequest: DefenseRequestFull;
     userRole: string;
+    proposalPanel?: Record<string, string | null> | null;
 }
 
 function PanelMemberCombobox({
@@ -295,6 +297,8 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
         setRequest(requestProp);
     }, [requestProp]);
     const awaitingCorrections = isAwaitingCorrections(request.workflow_state);
+    const panelLocked = ['prefinal', 'pre-final', 'final'].includes((request.defense_type ?? '').toLowerCase());
+    const proposalPanel = props.proposalPanel;
 
     // Confirmation dialog state for approve/reject/retrieve
     const [confirm, setConfirm] = useState<{ open: boolean; action: 'approve' | 'reject' | 'retrieve' | null }>({
@@ -399,9 +403,14 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
         schedule.scheduled_end_time > schedule.scheduled_time;
     const availabilityReady = validSlot && availability?.key === slotKey;
     const availableOptions = availabilityReady ? availability.options : panelMembers;
+    const panelReady = panelLocked ? !!proposalPanel : !!panels.defense_chairperson && !!panels.defense_panelist1;
     const selectedConflicts =
         availabilityReady &&
-        Object.values(panels).some((value) => value && !availability.options.some((option) => matchesPanel(option, value) && option.is_available));
+        (panelLocked
+            ? availability.proposal_panel_available !== true
+            : Object.values(panels).some(
+                  (value) => value && !availability.options.some((option) => matchesPanel(option, value) && option.is_available),
+              ));
     const adviserConflict = availabilityReady && availability.adviser?.is_available === false;
     const changingScheduledSlot =
         request.workflow_state === 'scheduled' &&
@@ -521,7 +530,7 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
     }
 
     async function saveSchedule() {
-        if (!availabilityReady || selectedConflicts || adviserConflict || !panels.defense_chairperson || !panels.defense_panelist1) {
+        if (!availabilityReady || selectedConflicts || adviserConflict || !panelReady) {
             toast.error('Choose a valid time, a chairperson, and at least one panel member without time conflicts.');
             return;
         }
@@ -556,7 +565,7 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                     'Content-Type': 'application/json',
                     Accept: 'application/json',
                 },
-                body: JSON.stringify({ ...schedule, ...panels }),
+                body: JSON.stringify(panelLocked ? schedule : { ...schedule, ...panels }),
             });
 
             const contentType = res.headers.get('content-type') || '';
@@ -1025,23 +1034,38 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                                             },
                                             {
                                                 key: 'defense_chairperson',
-                                                info: memberFor(panels.defense_chairperson || request.defense_chairperson, 'Panel Chair'),
+                                                info: memberFor(
+                                                    (!panelLocked && panels.defense_chairperson) || request.defense_chairperson,
+                                                    'Panel Chair',
+                                                ),
                                             },
                                             {
                                                 key: 'defense_panelist1',
-                                                info: memberFor(panels.defense_panelist1 || request.defense_panelist1, 'Panel Member'),
+                                                info: memberFor(
+                                                    (!panelLocked && panels.defense_panelist1) || request.defense_panelist1,
+                                                    'Panel Member',
+                                                ),
                                             },
                                             {
                                                 key: 'defense_panelist2',
-                                                info: memberFor(panels.defense_panelist2 || request.defense_panelist2, 'Panel Member'),
+                                                info: memberFor(
+                                                    (!panelLocked && panels.defense_panelist2) || request.defense_panelist2,
+                                                    'Panel Member',
+                                                ),
                                             },
                                             {
                                                 key: 'defense_panelist3',
-                                                info: memberFor(panels.defense_panelist3 || request.defense_panelist3, 'Panel Member'),
+                                                info: memberFor(
+                                                    (!panelLocked && panels.defense_panelist3) || request.defense_panelist3,
+                                                    'Panel Member',
+                                                ),
                                             },
                                             {
                                                 key: 'defense_panelist4',
-                                                info: memberFor(panels.defense_panelist4 || request.defense_panelist4, 'Panel Member'),
+                                                info: memberFor(
+                                                    (!panelLocked && panels.defense_panelist4) || request.defense_panelist4,
+                                                    'Panel Member',
+                                                ),
                                             },
                                         ].map((r) => {
                                             const namePresent = !!(r.info.rawValue || (r.info.displayName && r.info.displayName !== '—'));
@@ -1272,7 +1296,19 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                                             . Choose another time.
                                         </p>
                                     )}
-                                    {changingScheduledSlot && (
+                                    {panelLocked && (
+                                        <p className="text-muted-foreground text-sm" role={proposalPanel ? undefined : 'status'}>
+                                            {proposalPanel
+                                                ? 'This defense uses the chairperson and panelists from the completed Proposal Defense. Only the schedule can be changed.'
+                                                : 'A completed and passed Proposal Defense with an assigned chairperson and panel member is required before scheduling.'}
+                                        </p>
+                                    )}
+                                    {panelLocked && availabilityReady && availability.proposal_panel_available === false && (
+                                        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                                            A member of the Proposal panel is booked during this slot. Choose another time.
+                                        </p>
+                                    )}
+                                    {changingScheduledSlot && !panelLocked && (
                                         <p className="text-muted-foreground text-xs">
                                             Use Save Schedule below to save the new time and panel choices together.
                                         </p>
@@ -1285,39 +1321,48 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                                             { label: 'Panelist 2', key: 'defense_panelist2' },
                                             { label: 'Panelist 3', key: 'defense_panelist3' },
                                             { label: 'Panelist 4', key: 'defense_panelist4' },
-                                        ].map(({ label, key }) => (
-                                            <PanelMemberCombobox
-                                                key={key}
-                                                label={label}
-                                                value={panels[key as keyof typeof panels]}
-                                                onChange={(v) => setPanels((p) => ({ ...p, [key]: v }))}
-                                                options={availableOptions}
-                                                disabled={!canEdit || awaitingCorrections || loadingMembers || !availabilityReady}
-                                                taken={taken}
-                                            />
-                                        ))}
+                                        ].map(({ label, key }) =>
+                                            panelLocked ? (
+                                                <div key={key}>
+                                                    <div className="text-muted-foreground text-xs">{label}</div>
+                                                    <div className="text-sm font-medium">{proposalPanel?.[key] || '—'}</div>
+                                                </div>
+                                            ) : (
+                                                <PanelMemberCombobox
+                                                    key={key}
+                                                    label={label}
+                                                    value={panels[key as keyof typeof panels]}
+                                                    onChange={(v) => setPanels((p) => ({ ...p, [key]: v }))}
+                                                    options={availableOptions}
+                                                    disabled={!canEdit || awaitingCorrections || loadingMembers || !availabilityReady}
+                                                    taken={taken}
+                                                />
+                                            ),
+                                        )}
                                     </div>
-                                    <div className="mt-4 flex justify-end">
-                                        <Button
-                                            onClick={savePanels}
-                                            disabled={
-                                                !canEdit ||
-                                                awaitingCorrections ||
-                                                savingPanels ||
-                                                savingSchedule ||
-                                                !availabilityReady ||
-                                                selectedConflicts ||
-                                                adviserConflict ||
-                                                changingScheduledSlot
-                                            }
-                                            className="gap-2 text-white hover:cursor-pointer dark:bg-rose-500"
-                                        >
-                                            {savingPanels && <Loader2 className="h-4 w-4 animate-spin" />}
-                                            <Save className="h-4 w-4" />
-                                            Save Panel Assignment
-                                        </Button>
-                                    </div>
-                                    {panelLoadError && <div className="mt-2 text-xs text-red-500">{panelLoadError}</div>}
+                                    {!panelLocked && (
+                                        <div className="mt-4 flex justify-end">
+                                            <Button
+                                                onClick={savePanels}
+                                                disabled={
+                                                    !canEdit ||
+                                                    awaitingCorrections ||
+                                                    savingPanels ||
+                                                    savingSchedule ||
+                                                    !availabilityReady ||
+                                                    selectedConflicts ||
+                                                    adviserConflict ||
+                                                    changingScheduledSlot
+                                                }
+                                                className="gap-2 text-white hover:cursor-pointer dark:bg-rose-500"
+                                            >
+                                                {savingPanels && <Loader2 className="h-4 w-4 animate-spin" />}
+                                                <Save className="h-4 w-4" />
+                                                Save Panel Assignment
+                                            </Button>
+                                        </div>
+                                    )}
+                                    {!panelLocked && panelLoadError && <div className="mt-2 text-xs text-red-500">{panelLoadError}</div>}
                                 </div>
                                 <div className="mt-4 flex justify-end">
                                     <Button
@@ -1330,8 +1375,7 @@ function LoadedDefenseRequestDetailsPage(rawProps: PageProps) {
                                             !availabilityReady ||
                                             selectedConflicts ||
                                             adviserConflict ||
-                                            !panels.defense_chairperson ||
-                                            !panels.defense_panelist1
+                                            !panelReady
                                         }
                                         className="gap-2 hover:cursor-pointer dark:bg-rose-500 dark:text-white"
                                     >

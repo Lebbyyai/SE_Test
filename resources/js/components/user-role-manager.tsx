@@ -13,6 +13,8 @@ const roles = [
     { value: 'Administrative Assistant', label: 'Administrative Assistant (AA)' },
     { value: 'Dean', label: 'Dean' },
     { value: 'Finance', label: 'Finance' },
+    { value: 'Registrar', label: 'Registrar' },
+    { value: 'Proctor', label: 'Proctor' },
 ];
 
 export default function UserRoleManager({ accounts }: { accounts: Account[] }) {

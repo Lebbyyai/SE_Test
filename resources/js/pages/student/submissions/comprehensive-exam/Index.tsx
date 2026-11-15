@@ -22,6 +22,7 @@ type ApplicationVM = {
     school_year: string;
     permit_status: string;
     final_approval_status: string;
+    registrar_approval_status: string;
     contact_number?: string | null;
     telephone_number?: string | null;
     office_address?: string | null;
@@ -222,25 +223,35 @@ export default function ComprehensiveExamIndex() {
                                 </div>
                             </div>
                         </div>
-                        <Button
-                            className="w-full shrink-0 rounded-md bg-rose-500 px-5 text-sm text-white hover:bg-rose-600 sm:w-auto"
-                            onClick={() => setOpen(true)}
-                            disabled={!canApply || (!!application && hasPending)}
-                            title={
-                                examClosed
-                                    ? 'Exam is closed'
-                                    : !canApply
-                                      ? 'You are not eligible yet'
-                                      : hasPending
-                                        ? 'Application pending'
-                                        : 'Submit application'
-                            }
-                        >
-                            <Plus className="mr-1 h-4 w-4" />
-                            Submit application
-                        </Button>
+                        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+                            <Button
+                                className="w-full rounded-md bg-rose-500 px-5 text-sm text-white hover:bg-rose-600 sm:w-auto"
+                                onClick={() => setOpen(true)}
+                                disabled={!canApply || (!!application && hasPending)}
+                                title={
+                                    examClosed
+                                        ? 'Exam is closed'
+                                        : !canApply
+                                          ? 'You are not eligible yet'
+                                          : hasPending
+                                            ? 'Application pending'
+                                            : 'Submit application'
+                                }
+                            >
+                                <Plus className="mr-1 h-4 w-4" />
+                                Submit application
+                            </Button>
+                        </div>
                     </div>
                     <div className="flex flex-col gap-4">
+                        <div className="flex flex-wrap gap-3">
+                            <a className="underline" href="/comprehensive-documents">
+                                Exam documents
+                            </a>
+                            <a className="underline" href="/payment">
+                                Exam payment receipt
+                            </a>
+                        </div>
                         <CompreExamForm open={open} onOpenChange={setOpen} />
                         <div>
                             {application ? (
@@ -256,7 +267,14 @@ export default function ComprehensiveExamIndex() {
                                         mobile_no: application.contact_number ?? null,
                                         telephone_no: application.telephone_number ?? null,
                                         email: application.email,
-                                        status: application.final_approval_status || 'Pending',
+                                        status:
+                                            application.final_approval_status?.toLowerCase() === 'rejected'
+                                                ? 'rejected'
+                                                : application.registrar_approval_status?.toLowerCase() !== 'approved'
+                                                  ? 'registrar_pending'
+                                                  : application.final_approval_status?.toLowerCase() === 'approved'
+                                                    ? 'approved'
+                                                    : 'aa_pending',
                                         subjects: application.subjects,
                                         created_at: application.created_at ?? null,
                                     }}

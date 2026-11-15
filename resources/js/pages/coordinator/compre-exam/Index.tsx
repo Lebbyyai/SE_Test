@@ -21,19 +21,54 @@ export type CompreExamApplicationSummary = {
     applied: boolean;
     submitted_at: string | null;
     application_status: 'approved' | 'pending' | 'rejected' | 'not_yet_applied';
+    registrar_approval_status: 'approved' | 'pending' | null;
+    can_review: boolean;
+    can_schedule: boolean;
+    schedule: {
+        id: number;
+        exam_date: string;
+        exam_time: string;
+        venue: string;
+        proctors: string[];
+        proctor_ids: number[];
+        teacher_assigned: string | null;
+        change_reason: string | null;
+    } | null;
     permit_status: 'approved' | 'pending' | 'rejected' | null;
+    subjects: {
+        name: string | null;
+        code: string | null;
+        date: string | null;
+        start_time: string | null;
+        end_time: string | null;
+    }[];
+    response: {
+        id: number;
+        family_name: string;
+        first_name: string;
+        program: string;
+        contact_number: string;
+        email_address: string;
+        id_number: string;
+        created_at: string;
+        evaluated_at: string | null;
+    } | null;
 };
 
 type PageProps = {
+    auth: { user: { role: string } };
     programs: string[];
     eligible: CompreExamApplicationSummary[];
     notEligible: CompreExamApplicationSummary[];
     counts?: { eligible: number; notEligible: number };
+    proctorOptions: { id: number; name: string; email: string }[];
+    canEvaluateResponses: boolean;
 };
 
 export default function CoordinatorCompreExamIndex() {
     const { props } = usePage<PageProps>();
     const { eligible = [], notEligible = [] } = props;
+    const isCoordinator = props.auth.user.role === 'Coordinator';
 
     const [tab, setTab] = useState<'applications' | 'students'>('applications');
     const [q, setQ] = useState('');
@@ -90,15 +125,14 @@ export default function CoordinatorCompreExamIndex() {
                     </button>
                 </div>
                 <div className="mt-3">
-                    <TableCompreExam paged={paged} columns={columns} />
+                    <TableCompreExam
+                        paged={paged}
+                        columns={columns}
+                        proctorOptions={props.proctorOptions ?? []}
+                        canManageSchedules={isCoordinator}
+                        canEvaluateResponses={props.canEvaluateResponses}
+                    />
                 </div>
-
-                {/* <div className="mt-20">
-          <div className="text-sm text-zinc-500 mb-1">You can manage students in these programs:</div>
-          <div className="flex flex-wrap gap-2">
-            {programs.map((p, i) => <Badge key={i} variant="secondary">{p}</Badge>)}
-          </div>
-        </div> */}
             </div>
         </AppLayout>
     );
