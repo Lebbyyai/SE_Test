@@ -22,52 +22,11 @@ type RegisterForm = {
     school_id: string;
 };
 
-export const UIC_PROGRAMS: string[] = [
-    // Doctorate Programs
-    'Doctor of Philosophy in Education major in Educational Leadership',
-    'Doctor of Philosophy in Education major in Applied Linguistics',
-    'Doctor of Philosophy in Education major in Physical Education',
-    'Doctor of Philosophy in Pharmacy',
-    'Doctor of Philosophy in Education major in Mathematics',
-    'Doctor in Business Management with specialization in Information Systems',
-    'Doctor in Business Management',
-    'Doctor of Philosophy in Education major in Filipino',
-    'Doctor of Philosophy in Education major in Counseling',
-    'Doctor of Philosophy in Education major in Information Technology Integration',
-    'Doctor of Philosphy in Pharmacy',
+type ProgramOption = { name: string; code: string; category: string };
 
-    // Master’s Programs
-    'Master of Arts in Religious Education',
-    'Master in Counseling',
-    'Master in Business Administration (with Thesis)',
-    'Master in Business Administration for Health Professionals (Non-Thesis)',
-    'Master of Arts in Values Education',
-    'Master of Arts in Educational Management',
-    'Master of Arts in Education major in Sociology',
-    'Master in Business Administration (Non-Thesis)',
-    'Master of Arts in Teaching Chemistry',
-    'Master of Arts in Engineering Education major in Electronics and Communications Engineering',
-    'Master of Arts in Education major in Physical Education',
-    'Master of Arts in Teaching Physics',
-    'Master of Arts in Elementary Education',
-    'Master of Arts in Engineering Education major in Civil Engineering',
-    'Master of Arts in Education major in Mathematics',
-    'Master of Arts in Education major in Information Technology Integration',
-    'Master of Arts in Education major in Filipino',
-    'Master of Arts in Education major in English',
-    'Master of Arts in Education major in Music Education',
-    'Master of Arts in Counseling',
-    'Master in Information Systems',
-    'Master in Information Technology',
-    'Master of Science in Pharmacy',
-    'Master of Science in Medical Technology',
-];
-
-// simple split logic
-const DOCTORATE_PROGRAMS = UIC_PROGRAMS.filter((p) => p.startsWith('Doctor'));
-const MASTER_PROGRAMS = UIC_PROGRAMS.filter((p) => p.startsWith('Master'));
-
-export default function Register() {
+export default function Register({ programs = [] }: { programs?: ProgramOption[] }) {
+    const DOCTORATE_PROGRAMS = programs.filter((program) => program.category === 'Doctorate').map((program) => program.name);
+    const MASTER_PROGRAMS = programs.filter((program) => program.category === 'Masters').map((program) => program.name);
     const { data, setData, post, processing, errors, reset } = useForm<Required<RegisterForm>>({
         first_name: '',
         middle_name: '',

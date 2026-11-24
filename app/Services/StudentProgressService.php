@@ -47,10 +47,12 @@ class StudentProgressService
 
     public function programCatalog(): array
     {
-        return ProgramRecord::whereIn('category', ['Masters', 'Doctorate'])
-            ->get(['name', 'program'])
-            ->map(fn (ProgramRecord $program) => ['name' => $program->name, 'code' => $program->program])
-            ->all();
+        return collect(config('graduate_programs', []))
+            ->map(fn ($program) => ['name' => $program['name'], 'code' => $program['code']])
+            ->concat(ProgramRecord::whereIn('category', ['Masters', 'Doctorate'])
+                ->get(['name', 'program'])
+                ->map(fn (ProgramRecord $program) => ['name' => $program->name, 'code' => $program->program]))
+            ->unique('code')->sortBy('name')->values()->all();
     }
 
     private function subjectEnrollment(?StudentProgressRecord $record): ?string

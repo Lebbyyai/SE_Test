@@ -71,7 +71,8 @@ class CoordinatorProgramAssignmentController extends Controller
             ->where('program', '!=', '')
             ->pluck('program');
 
-        $allPrograms = $defensePrograms->merge($userPrograms)
+        $allPrograms = collect(config('graduate_programs', []))->pluck('name')
+            ->merge($defensePrograms)->merge($userPrograms)
             ->unique()
             ->sort()
             ->values();
